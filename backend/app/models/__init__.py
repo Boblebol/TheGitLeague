@@ -8,6 +8,12 @@ from app.models.user import (
     UserRole,
     UserStatus,
 )
+from app.models.project import (
+    Project,
+    Repository,
+    RemoteType,
+    RepoStatus,
+)
 
 __all__ = [
     "User",
@@ -16,4 +22,8 @@ __all__ = [
     "AuditLog",
     "UserRole",
     "UserStatus",
+    "Project",
+    "Repository",
+    "RemoteType",
+    "RepoStatus",
 ]

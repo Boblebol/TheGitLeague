@@ -13,6 +13,19 @@ from app.schemas.user import (
     TokenResponse,
     CurrentUser,
 )
+from app.schemas.project import (
+    ProjectCreate,
+    ProjectUpdate,
+    ProjectResponse,
+    ProjectWithRepos,
+    RepositoryCreate,
+    RepositoryUpdate,
+    RepositoryResponse,
+    RepositorySyncRequest,
+    RepositorySyncResponse,
+    RepositoryTestConnectionRequest,
+    RepositoryTestConnectionResponse,
+)
 
 __all__ = [
     "GitIdentityCreate",
@@ -26,4 +39,15 @@ __all__ = [
     "TokenVerifyRequest",
     "TokenResponse",
     "CurrentUser",
+    "ProjectCreate",
+    "ProjectUpdate",
+    "ProjectResponse",
+    "ProjectWithRepos",
+    "RepositoryCreate",
+    "RepositoryUpdate",
+    "RepositoryResponse",
+    "RepositorySyncRequest",
+    "RepositorySyncResponse",
+    "RepositoryTestConnectionRequest",
+    "RepositoryTestConnectionResponse",
 ]

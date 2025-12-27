@@ -67,6 +67,10 @@ class User(Base):
         back_populates="user",
         cascade="all, delete-orphan",
     )
+    projects: Mapped[List["Project"]] = relationship(
+        "Project",
+        back_populates="creator",
+    )
 
     def __repr__(self) -> str:
         return f"<User(id={self.id}, email={self.email}, role={self.role})>"
