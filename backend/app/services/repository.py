@@ -387,11 +387,11 @@ class RepositoryService:
         db.add(audit)
         db.commit()
 
-        # TODO: Trigger Celery task here (Feature C)
-        # task = sync_repo_task.delay(repo_id)
-        # return f"Sync triggered for {repo.name}", task.id
+        # Trigger Celery task
+        from app.workers.sync_tasks import sync_repo_task
+        task = sync_repo_task.delay(repo_id)
 
-        return f"Sync triggered for {repo.name} (worker not yet implemented)", None
+        return f"Sync triggered for {repo.name}", task.id
 
 
 # Singleton instance

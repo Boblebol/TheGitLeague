@@ -14,6 +14,7 @@ from app.models.project import (
     RemoteType,
     RepoStatus,
 )
+from app.models.commit import Commit
 
 __all__ = [
     "User",
@@ -26,4 +27,5 @@ __all__ = [
     "Repository",
     "RemoteType",
     "RepoStatus",
+    "Commit",
 ]

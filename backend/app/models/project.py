@@ -91,6 +91,9 @@ class Repository(Base):
 
     # Relationships
     project: Mapped["Project"] = relationship("Project", back_populates="repos")
+    commits: Mapped[List["Commit"]] = relationship(
+        "Commit", back_populates="repository", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<Repository {self.name} ({self.status})>"

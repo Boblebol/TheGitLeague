@@ -26,6 +26,11 @@ from app.schemas.project import (
     RepositoryTestConnectionRequest,
     RepositoryTestConnectionResponse,
 )
+from app.schemas.commit import (
+    CommitResponse,
+    CommitListResponse,
+    CommitStatsResponse,
+)
 
 __all__ = [
     "GitIdentityCreate",
@@ -50,4 +55,7 @@ __all__ = [
     "RepositorySyncResponse",
     "RepositoryTestConnectionRequest",
     "RepositoryTestConnectionResponse",
+    "CommitResponse",
+    "CommitListResponse",
+    "CommitStatsResponse",
 ]
