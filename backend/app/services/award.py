@@ -449,6 +449,313 @@ class AwardService:
         db.commit()
         return plays_created
 
+    def _get_first_season_players(self, season_id: str, db: Session) -> List[str]:
+        """
+        Get all players in their first season (rookies).
+
+        A player is a rookie if they have NO PlayerPeriodStats
+        in ANY season prior to the current season within the same project.
+
+        Args:
+            season_id: Season ID
+            db: Database session
+
+        Returns:
+            List of rookie user IDs
+        """
+        current_season = db.query(Season).filter(Season.id == season_id).first()
+        if not current_season:
+            return []
+
+        # Get all users with stats in current season
+        current_players = (
+            db.query(PlayerPeriodStats.user_id)
+            .filter(PlayerPeriodStats.season_id == season_id)
+            .distinct()
+            .all()
+        )
+
+        rookies = []
+        for (user_id,) in current_players:
+            # Check if user has stats in any previous season for this project
+            prior_stats = (
+                db.query(PlayerPeriodStats)
+                .join(Season, PlayerPeriodStats.season_id == Season.id)
+                .filter(
+                    and_(
+                        PlayerPeriodStats.user_id == user_id,
+                        Season.project_id == current_season.project_id,
+                        Season.start_at < current_season.start_at,
+                    )
+                )
+                .first()
+            )
+
+            if not prior_stats:
+                rookies.append(user_id)
+
+        return rookies
+
+    def calculate_rookie_of_month(
+        self, db: Session, last_month_start: Optional[date] = None
+    ) -> int:
+        """
+        Calculate Rookie of the Month awards for all active seasons.
+
+        Uses average impact score per active day to ensure fairness
+        between players who joined at different times.
+
+        Args:
+            db: Database session
+            last_month_start: Start date of the month to calculate (default: last month)
+
+        Returns:
+            Number of awards created
+        """
+        if last_month_start is None:
+            # First day of last month
+            today = datetime.now().date()
+            if today.month == 1:
+                last_month_start = today.replace(year=today.year - 1, month=12, day=1)
+            else:
+                last_month_start = today.replace(month=today.month - 1, day=1)
+
+        logger.info(f"Calculating Rookie of the Month for month starting {last_month_start}")
+
+        active_seasons = db.query(Season).filter(Season.status == SeasonStatus.ACTIVE).all()
+        awards_created = 0
+
+        # Calculate last day of month
+        if last_month_start.month == 12:
+            month_end = last_month_start.replace(year=last_month_start.year + 1, month=1, day=1)
+        else:
+            month_end = last_month_start.replace(month=last_month_start.month + 1, day=1)
+
+        for season in active_seasons:
+            # Get all rookies for this season
+            rookies = self._get_first_season_players(season.id, db)
+
+            if not rookies:
+                logger.info(f"No rookies found for season {season.name}")
+                continue
+
+            # Calculate average impact per active day for each rookie
+            scores = []
+            for rookie_id in rookies:
+                # Get daily stats for this rookie in the target month
+                daily_stats = (
+                    db.query(PlayerPeriodStats)
+                    .filter(
+                        and_(
+                            PlayerPeriodStats.user_id == rookie_id,
+                            PlayerPeriodStats.season_id == season.id,
+                            PlayerPeriodStats.period_type == "day",
+                            PlayerPeriodStats.period_start >= last_month_start,
+                            PlayerPeriodStats.period_start < month_end,
+                            PlayerPeriodStats.commits > 0,  # Active days only
+                        )
+                    )
+                    .all()
+                )
+
+                if not daily_stats:
+                    continue
+
+                total_impact = sum(s.impact_score for s in daily_stats)
+                total_pts = sum(s.pts for s in daily_stats)
+                total_commits = sum(s.commits for s in daily_stats)
+                active_days = len(daily_stats)
+                avg_impact = total_impact / active_days
+
+                scores.append(
+                    (
+                        rookie_id,
+                        avg_impact,
+                        total_impact,
+                        total_pts,
+                        total_commits,
+                        active_days,
+                    )
+                )
+
+            if not scores:
+                logger.info(f"No rookie activity for season {season.name}, month {last_month_start}")
+                continue
+
+            # Sort by avg_impact desc, then total_impact desc (tiebreaker)
+            scores.sort(key=lambda x: (x[1], x[2]), reverse=True)
+            winner = scores[0]
+            user_id, avg_impact, total_impact, total_pts, total_commits, active_days = winner
+
+            # Get user for logging
+            user = db.query(User).filter(User.id == user_id).first()
+
+            # Check if user is absent
+            mid_month = last_month_start + timedelta(days=15)
+            if self._is_user_absent(user_id, mid_month, db):
+                logger.info(f"Rookie {user.email} is absent, skipping award")
+                continue
+
+            # Check existing award
+            existing_award = (
+                db.query(Award)
+                .filter(
+                    and_(
+                        Award.season_id == season.id,
+                        Award.period_type == "month",
+                        Award.period_start == last_month_start,
+                        Award.award_type == AwardType.ROOKIE_OF_MONTH,
+                    )
+                )
+                .first()
+            )
+
+            if existing_award:
+                logger.info(
+                    f"Rookie of Month award already exists for season {season.name}, month {last_month_start}"
+                )
+                continue
+
+            award = Award(
+                season_id=season.id,
+                period_type="month",
+                period_start=last_month_start,
+                award_type=AwardType.ROOKIE_OF_MONTH,
+                user_id=user_id,
+                score=avg_impact,
+                metadata_json={
+                    "avg_impact_per_day": round(avg_impact, 2),
+                    "total_impact_score": round(total_impact, 2),
+                    "total_pts": total_pts,
+                    "total_commits": total_commits,
+                    "active_days": active_days,
+                },
+            )
+            db.add(award)
+            awards_created += 1
+            logger.info(f"Created Rookie of Month award for {user.email} in season {season.name}")
+
+        db.commit()
+        return awards_created
+
+    def calculate_rookie_of_year(self, season_id: str, db: Session) -> Optional[Award]:
+        """
+        Calculate Rookie of the Year award for a season.
+
+        Uses average impact score per active week to ensure fairness
+        between players who joined at different times.
+
+        Requires minimum 4 weeks of activity.
+
+        Args:
+            season_id: Season ID
+            db: Database session
+
+        Returns:
+            Award or None
+        """
+        logger.info(f"Calculating Rookie of the Year for season {season_id}")
+
+        season = db.query(Season).filter(Season.id == season_id).first()
+        if not season:
+            logger.error(f"Season {season_id} not found")
+            return None
+
+        # Get all rookies for this season
+        rookies = self._get_first_season_players(season_id, db)
+
+        if not rookies:
+            logger.info(f"No rookies found for season {season_id}")
+            return None
+
+        # Calculate average impact per active week for each rookie
+        scores = []
+        for rookie_id in rookies:
+            # Get weekly stats for this rookie
+            weekly_stats = (
+                db.query(PlayerPeriodStats)
+                .filter(
+                    and_(
+                        PlayerPeriodStats.user_id == rookie_id,
+                        PlayerPeriodStats.season_id == season_id,
+                        PlayerPeriodStats.period_type == "week",
+                        PlayerPeriodStats.commits > 0,  # Active weeks only
+                    )
+                )
+                .all()
+            )
+
+            # Minimum participation requirement: 4 weeks
+            if len(weekly_stats) < 4:
+                continue
+
+            total_impact = sum(s.impact_score for s in weekly_stats)
+            total_pts = sum(s.pts for s in weekly_stats)
+            total_commits = sum(s.commits for s in weekly_stats)
+            active_weeks = len(weekly_stats)
+            avg_impact = total_impact / active_weeks
+
+            scores.append(
+                (
+                    rookie_id,
+                    avg_impact,
+                    total_impact,
+                    total_pts,
+                    total_commits,
+                    active_weeks,
+                )
+            )
+
+        if not scores:
+            logger.info(f"No eligible rookies for season {season_id} (need 4+ weeks)")
+            return None
+
+        # Sort by avg_impact desc, then total_impact desc (tiebreaker)
+        scores.sort(key=lambda x: (x[1], x[2]), reverse=True)
+        winner = scores[0]
+        user_id, avg_impact, total_impact, total_pts, total_commits, active_weeks = winner
+
+        # Get user for logging
+        user = db.query(User).filter(User.id == user_id).first()
+
+        # Check existing award
+        existing_award = (
+            db.query(Award)
+            .filter(
+                and_(
+                    Award.season_id == season_id,
+                    Award.period_type == "season",
+                    Award.award_type == AwardType.ROOKIE_OF_YEAR,
+                )
+            )
+            .first()
+        )
+
+        if existing_award:
+            logger.info(f"Rookie of Year award already exists for season {season_id}")
+            return existing_award
+
+        award = Award(
+            season_id=season_id,
+            period_type="season",
+            period_start=season.start_at.date(),
+            award_type=AwardType.ROOKIE_OF_YEAR,
+            user_id=user_id,
+            score=avg_impact,
+            metadata_json={
+                "avg_impact_per_week": round(avg_impact, 2),
+                "total_impact_score": round(total_impact, 2),
+                "total_pts": total_pts,
+                "total_commits": total_commits,
+                "active_weeks": active_weeks,
+            },
+        )
+        db.add(award)
+        db.commit()
+
+        logger.info(f"Created Rookie of Year award for {user.email} in season {season.name}")
+        return award
+
     def get_awards(
         self,
         db: Session,

@@ -1249,6 +1249,148 @@ def calculate_play_of_day():
 - **Player of the Month:** Top impact score for the month
 - **MVP (Season End):** Top overall impact score for season
 - **Most Improved:** Biggest percentage increase vs. previous season
+- **Rookie of the Month:** Top rookie (first season) by average impact score per active day
+- **Rookie of the Year:** Top rookie (first season) by average impact score per active period
+
+**Rookie Award Calculation (Fair for Partial Seasons):**
+
+To ensure fairness between players who join at different times (e.g., January vs. July), rookie awards use **average metrics** instead of totals:
+
+```python
+def calculate_rookie_of_month(season_id, month_start, db):
+    """
+    Calculate Rookie of the Month award.
+
+    Eligibility:
+    - Player is in their first season (no stats in previous seasons)
+    - Player has at least one commit in the target month
+
+    Scoring:
+    - Average impact score per active day in the month
+    - Active day = day with at least one commit
+    - Formula: total_impact_score / active_days_count
+    """
+    # Get all players in their first season
+    rookies = get_first_season_players(season_id, db)
+
+    # For each rookie, calculate avg impact per active day
+    scores = []
+    for rookie_id in rookies:
+        daily_stats = db.query(PlayerPeriodStats).filter(
+            PlayerPeriodStats.user_id == rookie_id,
+            PlayerPeriodStats.season_id == season_id,
+            PlayerPeriodStats.period_type == 'day',
+            PlayerPeriodStats.period_start >= month_start,
+            PlayerPeriodStats.period_start < month_start + timedelta(days=31),
+            PlayerPeriodStats.commits > 0  # Active days only
+        ).all()
+
+        if not daily_stats:
+            continue
+
+        total_impact = sum(s.impact_score for s in daily_stats)
+        active_days = len(daily_stats)
+        avg_impact = total_impact / active_days
+
+        scores.append((rookie_id, avg_impact, total_impact))
+
+    # Award to highest average (with total as tiebreaker)
+    winner = max(scores, key=lambda x: (x[1], x[2]))
+    return winner
+
+def calculate_rookie_of_year(season_id, db):
+    """
+    Calculate Rookie of the Year award.
+
+    Eligibility:
+    - Player is in their first season
+    - Player has at least 4 weeks of activity
+
+    Scoring:
+    - Average impact score per active week
+    - Active week = week with at least one commit
+    - Formula: total_impact_score / active_weeks_count
+
+    Why per-week instead of per-day?
+    - Smooths out variance
+    - Someone joining in July with 26 weeks can fairly compete
+      against someone who joined in January with 52 weeks
+    """
+    rookies = get_first_season_players(season_id, db)
+
+    scores = []
+    for rookie_id in rookies:
+        weekly_stats = db.query(PlayerPeriodStats).filter(
+            PlayerPeriodStats.user_id == rookie_id,
+            PlayerPeriodStats.season_id == season_id,
+            PlayerPeriodStats.period_type == 'week',
+            PlayerPeriodStats.commits > 0
+        ).all()
+
+        if len(weekly_stats) < 4:  # Minimum participation
+            continue
+
+        total_impact = sum(s.impact_score for s in weekly_stats)
+        active_weeks = len(weekly_stats)
+        avg_impact = total_impact / active_weeks
+
+        scores.append((rookie_id, avg_impact, total_impact, active_weeks))
+
+    winner = max(scores, key=lambda x: (x[1], x[2]))
+    return winner
+
+def get_first_season_players(season_id, db):
+    """
+    Get all players in their first season.
+
+    A player is a rookie if they have NO PlayerPeriodStats
+    in ANY season prior to the current season.
+    """
+    current_season = db.query(Season).filter(Season.id == season_id).first()
+
+    # Get all users with stats in current season
+    current_players = (
+        db.query(PlayerPeriodStats.user_id)
+        .filter(PlayerPeriodStats.season_id == season_id)
+        .distinct()
+        .all()
+    )
+
+    rookies = []
+    for (user_id,) in current_players:
+        # Check if user has stats in any previous season
+        prior_stats = (
+            db.query(PlayerPeriodStats)
+            .join(Season, PlayerPeriodStats.season_id == Season.id)
+            .filter(
+                PlayerPeriodStats.user_id == user_id,
+                Season.project_id == current_season.project_id,
+                Season.start_date < current_season.start_date
+            )
+            .first()
+        )
+
+        if not prior_stats:
+            rookies.append(user_id)
+
+    return rookies
+```
+
+**Example Scenarios:**
+
+1. **Alice joins in January, Bob joins in July (same season):**
+   - Alice has 26 active weeks, total impact = 2600, avg = 100
+   - Bob has 13 active weeks, total impact = 1430, avg = 110
+   - **Winner: Bob** (higher average despite lower total)
+
+2. **Alice has 5 active weeks, Bob has 4 active weeks:**
+   - Alice: avg = 95
+   - Bob: avg = 100
+   - **Winner: Bob** (both meet minimum participation of 4 weeks)
+
+3. **Alice has 3 active weeks (below minimum):**
+   - **Not eligible** for Rookie of the Year (needs 4+ weeks)
+   - Can still win Rookie of the Month if she's active that month
 
 #### Acceptance Criteria
 

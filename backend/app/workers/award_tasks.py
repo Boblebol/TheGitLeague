@@ -87,6 +87,45 @@ def calculate_monthly_awards_task() -> dict:
 
 
 @celery_app.task
+def calculate_rookie_of_month_task() -> dict:
+    """
+    Calculate Rookie of the Month awards.
+
+    Scheduled to run on the 1st of each month at 00:00 (after monthly awards).
+    Calculates rookie awards for the previous month.
+
+    Returns:
+        Dictionary with task results
+    """
+    logger.info("Starting Rookie of the Month calculation task")
+
+    with get_db_context() as db:
+        try:
+            # First day of last month
+            today = datetime.now().date()
+            if today.month == 1:
+                last_month_start = today.replace(year=today.year - 1, month=12, day=1)
+            else:
+                last_month_start = today.replace(month=today.month - 1, day=1)
+
+            awards_created = award_service.calculate_rookie_of_month(db, last_month_start)
+
+            logger.info(f"Rookie of Month task completed: {awards_created} awards created")
+            return {
+                "success": True,
+                "awards_created": awards_created,
+                "month_start": last_month_start.isoformat(),
+            }
+
+        except Exception as e:
+            logger.error(f"Error calculating Rookie of Month: {str(e)}", exc_info=True)
+            return {
+                "success": False,
+                "error": str(e),
+            }
+
+
+@celery_app.task
 def calculate_play_of_day_task() -> dict:
     """
     Calculate Play of the Day.

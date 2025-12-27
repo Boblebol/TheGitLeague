@@ -28,6 +28,8 @@ class AwardType(str, enum.Enum):
     PLAYER_OF_MONTH = "player_of_month"
     MVP = "mvp"  # Season MVP
     MOST_IMPROVED = "most_improved"
+    ROOKIE_OF_MONTH = "rookie_of_month"  # Best first-season player this month
+    ROOKIE_OF_YEAR = "rookie_of_year"  # Best first-season player this season
 
 
 class Award(Base):
