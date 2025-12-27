@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.models.leaderboard import PlayerPeriodStats
 from app.models.season import Season
-from app.models.user import User
+from app.models.user import User, UserStatus
 from app.utils.periods import get_period_start
 
 logger = logging.getLogger(__name__)
@@ -59,7 +59,7 @@ class LeaderboardService:
             from datetime import datetime
             period_start = get_period_start(datetime.utcnow(), period_type, season)
 
-        # Build base query
+        # Build base query (exclude retired players from active leaderboards)
         query = (
             db.query(PlayerPeriodStats, User)
             .join(User, PlayerPeriodStats.user_id == User.id)
@@ -68,6 +68,7 @@ class LeaderboardService:
                     PlayerPeriodStats.season_id == season_id,
                     PlayerPeriodStats.period_type == period_type,
                     PlayerPeriodStats.period_start == period_start,
+                    User.status != UserStatus.RETIRED,  # Exclude retired players
                 )
             )
         )

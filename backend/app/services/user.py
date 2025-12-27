@@ -234,6 +234,106 @@ class UserService:
 
         return user
 
+    def retire_user(
+        self,
+        user_id: str,
+        db: Session,
+        current_user: User,
+    ) -> User:
+        """
+        Retire a user (Commissioner only).
+
+        Args:
+            user_id: User ID to retire
+            db: Database session
+            current_user: Current authenticated user (must be Commissioner)
+
+        Returns:
+            Retired user
+
+        Raises:
+            HTTPException: If user not found
+        """
+        user = self.get_user_by_id(user_id, db)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found",
+            )
+
+        if user.status == UserStatus.RETIRED:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User is already retired",
+            )
+
+        user.status = UserStatus.RETIRED
+        db.commit()
+        db.refresh(user)
+
+        # Create audit log
+        audit = AuditLog(
+            user_id=current_user.id,
+            action="retire_user",
+            resource_type="user",
+            resource_id=user_id,
+            details=f"Retired user {user.email}",
+        )
+        db.add(audit)
+        db.commit()
+
+        return user
+
+    def unretire_user(
+        self,
+        user_id: str,
+        db: Session,
+        current_user: User,
+    ) -> User:
+        """
+        Reactivate a retired user (Commissioner only).
+
+        Args:
+            user_id: User ID to reactivate
+            db: Database session
+            current_user: Current authenticated user (must be Commissioner)
+
+        Returns:
+            Reactivated user
+
+        Raises:
+            HTTPException: If user not found or not retired
+        """
+        user = self.get_user_by_id(user_id, db)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found",
+            )
+
+        if user.status != UserStatus.RETIRED:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User is not retired",
+            )
+
+        user.status = UserStatus.APPROVED
+        db.commit()
+        db.refresh(user)
+
+        # Create audit log
+        audit = AuditLog(
+            user_id=current_user.id,
+            action="unretire_user",
+            resource_type="user",
+            resource_id=user_id,
+            details=f"Reactivated user {user.email}",
+        )
+        db.add(audit)
+        db.commit()
+
+        return user
+
 
 # Singleton instance
 user_service = UserService()

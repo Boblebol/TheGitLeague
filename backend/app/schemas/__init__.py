@@ -67,6 +67,14 @@ from app.schemas.award import (
     AwardResponse,
     PlayOfTheDayResponse,
 )
+from app.schemas.hall_of_fame import (
+    AllTimeLeader,
+    SeasonRecord,
+    AwardRecord,
+    StreakRecord,
+    RetiredPlayer,
+    HallOfFameResponse,
+)
 
 __all__ = [
     "GitIdentityCreate",
@@ -120,4 +128,10 @@ __all__ = [
     "PlayerTrendResponse",
     "AwardResponse",
     "PlayOfTheDayResponse",
+    "AllTimeLeader",
+    "SeasonRecord",
+    "AwardRecord",
+    "StreakRecord",
+    "RetiredPlayer",
+    "HallOfFameResponse",
 ]
