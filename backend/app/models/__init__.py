@@ -22,6 +22,7 @@ from app.models.season import (
     SeasonStatus,
 )
 from app.models.leaderboard import PlayerPeriodStats
+from app.models.award import Award, PlayOfTheDay, AwardType
 
 __all__ = [
     "User",
@@ -40,4 +41,7 @@ __all__ = [
     "Absence",
     "SeasonStatus",
     "PlayerPeriodStats",
+    "Award",
+    "PlayOfTheDay",
+    "AwardType",
 ]

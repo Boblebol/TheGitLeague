@@ -56,6 +56,12 @@ class Season(Base):
     period_stats: Mapped[List["PlayerPeriodStats"]] = relationship(
         "PlayerPeriodStats", back_populates="season", cascade="all, delete-orphan"
     )
+    awards: Mapped[List["Award"]] = relationship(
+        "Award", back_populates="season", cascade="all, delete-orphan"
+    )
+    plays_of_day: Mapped[List["PlayOfTheDay"]] = relationship(
+        "PlayOfTheDay", back_populates="season", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<Season {self.name} ({self.status})>"

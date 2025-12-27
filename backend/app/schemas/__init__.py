@@ -63,6 +63,10 @@ from app.schemas.player import (
     TrendDataPoint,
     PlayerTrendResponse,
 )
+from app.schemas.award import (
+    AwardResponse,
+    PlayOfTheDayResponse,
+)
 
 __all__ = [
     "GitIdentityCreate",
@@ -114,4 +118,6 @@ __all__ = [
     "PlayerProfileResponse",
     "TrendDataPoint",
     "PlayerTrendResponse",
+    "AwardResponse",
+    "PlayOfTheDayResponse",
 ]

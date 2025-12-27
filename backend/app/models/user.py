@@ -81,6 +81,16 @@ class User(Base):
         back_populates="user",
         cascade="all, delete-orphan",
     )
+    awards: Mapped[List["Award"]] = relationship(
+        "Award",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    plays_of_day: Mapped[List["PlayOfTheDay"]] = relationship(
+        "PlayOfTheDay",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
 
     def __repr__(self) -> str:
         return f"<User(id={self.id}, email={self.email}, role={self.role})>"
