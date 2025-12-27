@@ -124,6 +124,7 @@ ENVIRONMENT=development
 NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
 
 # Email (magic links) — use Mailhog for development
+# For production setup (SendGrid, AWS SES, Gmail, etc.), see EMAIL_SETUP.md
 SMTP_HOST=localhost
 SMTP_PORT=1025
 SMTP_USER=
@@ -159,6 +160,8 @@ Access:
 - Frontend: http://localhost:3000
 - API docs: http://localhost:8000/docs
 - Mailhog: http://localhost:8025
+
+> **📧 Email Setup:** For production email configuration (SendGrid, AWS SES, Gmail), see [EMAIL_SETUP.md](./EMAIL_SETUP.md)
 
 **Option B: Infrastructure only (for local development)**
 

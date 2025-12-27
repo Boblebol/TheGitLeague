@@ -96,6 +96,7 @@ open http://localhost:3000
 ## 📖 Documentation
 
 - [**Development Guide**](./DEVELOPMENT.md) — Setup dev environment, architecture, stack
+- [**Email Setup Guide**](./EMAIL_SETUP.md) — Configure email providers for magic link authentication
 - [**Contributing**](./CONTRIBUTING.md) — How to contribute to the project
 - [**Architecture**](./ARCHITECTURE.md) — Technical design and data models
 - [**API Specification**](./API_SPEC.md) — REST API endpoints and schemas
