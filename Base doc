@@ -1,0 +1,774 @@
+📄 1) PRD.md
+
+# 🏀 The Git League — PRD
+
+## 1.1 Vision & Positioning
+
+### 🎯 Pitch produit
+**The Git League** transforme l’activité Git de ton entreprise en **league NBA** : stats, classements, awards, “plays of the day”, saisons, fantasy league — le tout **auto-hébergeable** et **open source**.
+
+### 😖 Problème résolu (pain points)
+- **Aucune vision fun + actionnable** de la contribution : Git log brut, dashboards froids, pas d’engagement.
+- **Reconnaissance biaisée** (les “visible commits” / grosses features) : pas de highlights, pas de palmarès, pas d’awards réguliers.
+- **Difficile d’animer une équipe** : pas de saisons, pas de rythme (joueur de la semaine/mois), pas de “storyline”.
+- **Multi-projets** : contributions dispersées, impossible de comparer / agréger proprement.
+- **Self-host** : besoin d’un outil qui ne pousse pas les données code vers un SaaS externe.
+
+### 👥 Target audience
+**Persona principal : “Commissioner” (Engineering Manager / Tech Lead / Head of Eng)**
+- Objectif : animer, mesurer, célébrer, structurer les saisons, gérer les accès.
+
+**Secondaires**
+- **Players** (développeurs/contributeurs) : veulent leurs stats, palmarès, progression, reconnaissance.
+- **Spectators** (PM/Design/QA/Stakeholders) : veulent suivre sans écrire, accès contrôlé.
+
+### 🏆 USP (Unique Selling Proposition)
+- **Gamification NBA-native** + **Fantasy league** sur des métriques Git **normalisées** (anti-biais).
+- **Auto-hébergeable**, compatible environnements entreprise (RBAC, audit, rétention, pas d’exfiltration).
+- **Multi-repos / multi-projets** avec **saisons** et **HOF** (Hall of Fame) pour historiser proprement.
+
+---
+
+## 1.2 Features V1 (MVP) — DÉTAILLÉES
+
+> Objectif MVP : Ingestion Git fiable + stats + ladder + profils + rôles + saisons + awards basiques + fantasy simple.
+
+### ✅ Feature A — Onboarding & Auth (RBAC)
+**Description**
+- Auth via email + lien magique (ou SSO optionnel post-V1).
+- 3 rôles : **Commissioner**, **Player**, **Spectator** (spectateurs nécessitent validation).
+- Matching “Player” via **emails connus dans les commits** (ou mapping manuel).
+
+**User stories**
+- En tant que **commissioner**, je veux inviter des utilisateurs et définir leur rôle, pour contrôler l’accès.
+- En tant que **player**, je veux me connecter et être automatiquement associé à mes commits, pour voir mes stats.
+- En tant que **spectator**, je veux demander l’accès, pour suivre la league sans contribuer.
+
+**Critères d’acceptation**
+- [ ] Login email + token à usage unique (expiration 15 min).
+- [ ] Un utilisateur peut avoir plusieurs identités Git (emails multiples).
+- [ ] Un spectator n’accède à rien tant que non approuvé.
+- [ ] Audit minimal : qui a approuvé qui + quand.
+
+**Priorité** : **Must-have**
+
+---
+
+### ✅ Feature B — Gestion multi-projets & repos (Commissioner console)
+**Description**
+- Un “Project” = collection de repos.
+- Un repo est configuré avec : URL/chemin, mode d’accès (local bare / SSH / HTTPS token), branche(s) suivie(s), fréquence de sync, fenêtres d’absence.
+
+**User stories**
+- En tant que **commissioner**, je veux créer un projet et y attacher plusieurs repos, pour centraliser la league.
+- En tant que **commissioner**, je veux configurer les règles d’ingestion, pour maîtriser performance & sécurité.
+
+**Critères d’acceptation**
+- [ ] CRUD Project.
+- [ ] CRUD Repo avec statut : `healthy / syncing / error`.
+- [ ] Paramètres : branches, “since date”, fréquence (cron-like simple), exclusions (paths optionnels V1.1).
+- [ ] Écran “last sync” + “last commit ingested” (sha).
+
+**Priorité** : **Must-have**
+
+---
+
+### ✅ Feature C — Ingestion Git → DB (ETL)
+**Description**
+- Extraction des commits + stats diff : sha, author name/email, committer name/email, date, message (titre + body), additions, deletions, files changed (optionnel), parents, branch.
+- Ingestion incrémentale par repo, idempotente.
+
+**User stories**
+- En tant que **commissioner**, je veux synchroniser les repos, pour avoir des stats à jour.
+- En tant que **système**, je veux éviter les doublons, pour garantir des classements corrects.
+
+**Critères d’acceptation**
+- [ ] Ingestion incrémentale (par `last_ingested_sha` ou `max(commit_date)` + fallback).
+- [ ] Idempotence : relancer une sync ne duplique pas.
+- [ ] Gestion réorg / force-push : stratégie V1 “best effort” (marquer commits orphelins, ne pas casser).
+- [ ] Perf : 100k commits ingérés < 5 minutes sur machine dev correcte (objectif), avec pagination/streaming.
+- [ ] Logs structurés + page “sync errors” par repo.
+
+**Priorité** : **Must-have**
+
+---
+
+### ✅ Feature D — Stats Core & Normalisation “NBA-based”
+**Description**
+- Calcul des métriques brutes (Git) + métriques dérivées (NBA).
+- Exemples bruts : commits, additions, deletions, net lines, “impact index”.
+- Exemples NBA : PTS/REB/AST/BLK/STL/TOV (mapping configurable par commissioner).
+
+**Mapping recommandé (V1)**
+- **PTS** = additions (capées) + commits pondérés
+- **REB** = deletions (capées) (ou “cleanup”)
+- **AST** = commits touchant plusieurs fichiers (proxy collaboration) OU commits non-triviaux à faible churn (option)
+- **BLK** = revert / fix commit détecté (simple heuristique “fix|bug|hotfix”)
+- **TOV** = commits “wip|tmp|debug” ou très hauts churn sans message clair (heuristique)
+
+> Important : V1 = heuristiques simples + **transparence** (“comment c’est calculé”) + réglages.
+
+**User stories**
+- En tant que **player**, je veux voir mes stats “saison” et “carrière”, pour suivre ma progression.
+- En tant que **commissioner**, je veux ajuster les coefficients, pour coller à la culture de l’équipe.
+
+**Critères d’acceptation**
+- [ ] Page “Rules” expliquant mapping + coefficients.
+- [ ] Coefficients modifiables (par projet) sans migration (table config).
+- [ ] Recalcule possible sur une saison (job asynchrone).
+- [ ] Affichage “brut” + “NBA” côte à côte.
+
+**Priorité** : **Must-have**
+
+---
+
+### ✅ Feature E — Saisons, périodes, absences (League engine)
+**Description**
+- Une saison = intervalle [start, end] + statut (draft / active / closed).
+- Périodes : week / month (dérivées des dates).
+- Absences : intervals par player (exclure des awards/leaderboards optionnel).
+
+**User stories**
+- En tant que **commissioner**, je veux définir une saison, pour cadrer la compétition.
+- En tant que **commissioner**, je veux enregistrer une absence, pour éviter de pénaliser un joueur.
+
+**Critères d’acceptation**
+- [ ] CRUD Saison + activation (1 active max par projet).
+- [ ] Leaderboards filtrables : “Saison”, “Cette semaine”, “Ce mois”.
+- [ ] Absence : exclure du “player of week/month” (option ON/OFF par règle).
+
+**Priorité** : **Must-have**
+
+---
+
+### ✅ Feature F — Leaderboards & Ladder board
+**Description**
+- Classements par métriques (NBA points, commits, impact index).
+- Vues : global projet, par repo, par période.
+- “Streaks” (jours actifs) V1 simple.
+
+**User stories**
+- En tant que **spectator**, je veux voir le classement, pour suivre la league.
+- En tant que **player**, je veux comparer mes stats à d’autres, pour me situer.
+
+**Critères d’acceptation**
+- [ ] Ladder triable par métrique.
+- [ ] Filtres : saison/période, repo, role (players only).
+- [ ] Perf : leaderboard < 300ms pour 200 joueurs / 1M commits (avec agrégations pré-calculées).
+
+**Priorité** : **Must-have**
+
+---
+
+### ✅ Feature G — Profils joueurs (carrière + palmarès)
+**Description**
+- Page profil : stats saison, carrière, historiques, awards.
+- Graphs simples : trend weekly/monthly.
+
+**User stories**
+- En tant que **player**, je veux un profil avec mes stats et récompenses, pour avoir mon “player card”.
+- En tant que **commissioner**, je veux consulter un joueur, pour comprendre sa contribution.
+
+**Critères d’acceptation**
+- [ ] Profil accessible via leaderboard + recherche.
+- [ ] Sections : “Saison”, “Carrière”, “Awards”, “Repos”.
+- [ ] Graphs : commits/PTS par semaine (12-24 points).
+
+**Priorité** : **Must-have**
+
+---
+
+### ✅ Feature H — Awards & Highlights (V1)
+**Description**
+- Awards automatiques :
+  - Player of the Week
+  - Player of the Month
+  - MVP (fin de saison)
+  - Most Improved (comparaison saison N vs N-1)
+- “Play of the Day” = meilleur commit du jour (score composite).
+
+**User stories**
+- En tant que **player**, je veux gagner des awards, pour être reconnu.
+- En tant que **spectator**, je veux voir les highlights, pour suivre les moments forts.
+
+**Critères d’acceptation**
+- [ ] Calcul automatique, deterministic, expliqué (score breakdown).
+- [ ] “Play of the Day” montre : message, stats diff, repo, auteur, date.
+- [ ] Exclure merges (option ON/OFF) pour éviter bruit.
+
+**Priorité** : **Must-have**
+
+---
+
+### ✅ Feature I — Fantasy League (simple draft + scoring)
+**Description**
+- Commissioner crée une “Fantasy League” par saison.
+- Règle V1 : chaque participant choisit **1 à 5 contributeurs** (pool défini par commissioner).
+- Scoring : somme des PTS/REB/AST… des joueurs choisis sur la période.
+
+**User stories**
+- En tant que **commissioner**, je veux définir le pool de joueurs draftables, pour cadrer le jeu.
+- En tant que **participant fantasy**, je veux choisir mon roster, pour marquer des points.
+
+**Critères d’acceptation**
+- [ ] Draft mode : “pick list” (pas besoin de tour par tour V1) OU “snake draft” (option).
+- [ ] Un roster respecte min/max (1..5).
+- [ ] Leaderboard fantasy par période + total saison.
+- [ ] Lock du roster après date limite.
+
+**Priorité** : **Should-have** (mais très centrale à l’identité)
+
+---
+
+### ✅ Feature J — Hall of Fame (HOF) + Retraites
+**Description**
+- Marquer un joueur “retired”.
+- HOF = agrégation all-time, records, top awards.
+
+**User stories**
+- En tant que **commissioner**, je veux retirer un joueur, pour garder l’historique propre.
+- En tant que **spectator**, je veux voir le HOF, pour célébrer les légendes.
+
+**Critères d’acceptation**
+- [ ] Flag “retired” (n’apparaît plus dans saisons futures).
+- [ ] HOF page : top 10 all-time + records (commits, PTS, awards).
+- [ ] Historique inchangé : les saisons passées restent cohérentes.
+
+**Priorité** : **Should-have**
+
+---
+
+### 🧩 Options ambiguës (choix à trancher)
+1) **Scoring “NBA”**
+- **Option A (simple, robuste)** : additions/deletions/commits + caps + coefficients ✅
+- **Option B (plus “qualité”)** : intégrer PRs/reviews/issues (post-V1) ➕ mais dépend plateforme
+
+2) **Fantasy Draft**
+- **Option A** : sélection libre (rapide, moins fun)
+- **Option B** : snake draft avec timer (plus fun, plus UX à construire)
+
+3) **Ingestion**
+- **Option A** : cloner repos localement (bare) sur le serveur (simple, perf)
+- **Option B** : lire via API GitHub/GitLab (moins stockage, mais API limits + auth complexe)
+
+---
+
+## 1.3 Features Post-V1
+
+### Phase 2 (3–6 mois) — “classiques”
+- 🔎 Recherche commits & plays (S) — full-text sur messages/auteurs/repos
+- 🧠 Anti-biais amélioré (M) — caps dynamiques, “garbage time”, exclusion merges/squash rules
+- 🧩 Tags & “Seasons narratives” (S) — thèmes, recap auto
+- 👥 Teams / Squads (M) — classements par équipe/tribu
+- 🔔 Notifications (M) — Slack/Email : awards, play of day, weekly recap
+- 🧾 Export CSV/JSON (S) — pour BI interne
+- 🔐 SSO (SAML/OIDC) (L) — entreprises
+
+### Phase 3 (6–12 mois) — IA & avancées
+- 🤖 “Commit quality coach” (L) — suggestions sur messages, détection WIP, conventions
+- 🧠 Clustering auto des contributions (M) — regrouper par feature/area via embeddings (self-host)
+- 🏗️ “Impact estimation” (L) — relier commits à modules critiques / ownership (via code graph)
+- 🧑‍⚖️ Awards semi-assistés (M) — propose nominees + vote interne
+- 🔌 Intégrations (M/L) — GitHub/GitLab/Bitbucket, Jira/Linear, Slack, Teams
+
+
+⸻
+
+⌨️ 2) SHORTCUTS.md
+
+# ⌨️ The Git League — Raccourcis Clavier
+
+> App web : on privilégie des raccourcis **in-app** type “Slack/Notion”.
+> ⚠️ Les raccourcis “globaux” sont limités par le navigateur (pas de vrai global hotkey).
+> On évite les collisions VS Code / Chrome (ex: ⌘L, ⌘T, ⌘W, ⌘R…).
+
+## Raccourcis “Quasi-Globaux” (fonctionnent quand l’onglet est actif)
+| Raccourci | Action | Priorité |
+|-----------|--------|----------|
+| ⌘K | Ouvrir la Command Palette | Critique |
+| ⌘/ | Ouvrir l’aide raccourcis | Important |
+| Esc | Fermer modales / drawers | Critique |
+| ⌘Enter | Confirmer action principale (dans modales) | Important |
+
+## In-App — Navigation
+| Raccourci | Action |
+|-----------|--------|
+| g ثم l (g puis l) | Aller au **Leaderboard** |
+| g ثم p | Aller à **Mon Profil** |
+| g ثم a | Aller à **Awards** |
+| g ثم f | Aller à **Fantasy** |
+| g ثم s | Aller à **Settings** (si commissioner) |
+| ⌥← / ⌥→ | Naviguer période précédente/suivante (week/month) |
+
+> “g puis …” imite GitHub (mnémonique, peu de conflits).
+
+## In-App — Recherche & filtres
+| Raccourci | Action |
+|-----------|--------|
+| / | Focus sur recherche (si présente) |
+| ⌘F | Focus recherche interne (NE PAS hijack le find du navigateur si possible) |
+| ⌥1..⌥5 | Basculer métrique (PTS/REB/AST/… config) |
+| ⌥R | Filtre repo (ouvrir dropdown) |
+| ⌥T | Filtre période (week/month/season) |
+
+## In-App — Leaderboard
+| Raccourci | Action |
+|-----------|--------|
+| ↑ / ↓ | Naviguer dans la liste |
+| Enter | Ouvrir profil du joueur sélectionné |
+| Space | “Pin”/suivre un joueur (favori) |
+| ⌘D | Ouvrir détail score (breakdown) |
+
+## In-App — Profil joueur
+| Raccourci | Action |
+|-----------|--------|
+| 1 | Tab “Saison” |
+| 2 | Tab “Carrière” |
+| 3 | Tab “Awards” |
+| 4 | Tab “Repos” |
+| ⌥H | Aller au Hall of Fame |
+
+## In-App — Fantasy
+| Raccourci | Action |
+|-----------|--------|
+| ⌘N | Nouveau roster / modifier sélection |
+| ⌘S | Sauver roster |
+| ⌘L | Lock roster (si autorisé) |
+| ⌥↑ / ⌥↓ | Réordonner picks |
+
+## In-App — Commissioner Console
+| Raccourci | Action |
+|-----------|--------|
+| ⌘N | Nouveau projet / repo / saison (selon page) |
+| ⌘S | Sauvegarder config |
+| ⌘B | Lancer sync (bouton “Sync now”) |
+| ⌘⇧L | Ouvrir logs de sync |
+
+## Principes de design (raccourcis)
+- ✅ Mnémoniques : K=command, g=go, f=fantasy, l=leaderboard
+- ✅ Pas de collisions majeures navigateur : éviter ⌘T, ⌘L, ⌘R, ⌘W
+- ✅ Aide intégrée : ⌘/ affiche la liste contextualisée par page
+
+
+⸻
+
+🛠️ 3) TECHNICAL_STACK.md
+
+# 🛠️ The Git League — Technical Stack
+
+## 3.1 Architecture recommandée
+
+### Option recommandée (simple, robuste, self-host) ✅
+- **Frontend** : Next.js (App Router) + TypeScript + Tailwind + shadcn/ui
+- **Backend API** : Python **FastAPI**
+- **Jobs/Workers** : Python (Celery/RQ) OU worker Rust dédié si ingestion massive
+- **DB** : PostgreSQL
+- **Cache/Queue** : Redis (pour jobs + rate limiting)
+- **Déploiement** : Docker Compose + Dokploy
+
+```text
+┌─────────────────────────────┐        ┌─────────────────────────────┐
+│        Frontend (Web)       │        │           Backend           │
+│ Next.js + TS + shadcn/ui    │ <----> │ FastAPI (REST) + OpenAPI    │
+│ TanStack Query (cache)      │        │ Auth + RBAC + League Engine │
+└──────────────┬──────────────┘        └──────────────┬──────────────┘
+               │                                       │
+               │                                       │ enqueue jobs
+               │                                       ▼
+               │                          ┌─────────────────────────────┐
+               │                          │      Worker / Scheduler      │
+               │                          │ Git ingestion + recompute    │
+               │                          └──────────────┬──────────────┘
+               │                                         │
+               ▼                                         ▼
+       ┌──────────────┐                         ┌───────────────────────┐
+       │   Postgres    │ <---------------------- │   Repo storage (bare) │
+       └──────────────┘                         └───────────────────────┘
+                    ▲
+                    │
+               ┌─────────┐
+               │  Redis  │
+               └─────────┘
+
+Option performance (si très gros repos) ⚡
+	•	Remplacer le worker ingestion par un binaire Rust (libgit2) qui pousse en DB (ou via API interne).
+	•	Utile si : millions de commits, besoin de parsing ultra rapide, CPU bound.
+
+⸻
+
+3.2 Bibliothèques clés
+
+Frontend (npm)
+	•	next / react / typescript
+	•	Usage : app web (routing, SSR/CSR hybride)
+	•	@tanstack/react-query
+	•	Usage : cache API, invalidation après recompute/sync
+	•	Alternative : SWR (plus simple, moins “state machine”)
+	•	tailwindcss + shadcn/ui + lucide-react
+	•	Usage : UI cohérente + velocity dev
+	•	zod
+	•	Usage : validation côté front (schemas partagés possibles)
+	•	react-hook-form
+	•	Usage : forms settings (repos, seasons, coefficients)
+	•	recharts (ou visx)
+	•	Usage : graphs simples (trend weekly/monthly)
+	•	Alternative : Chart.js (ok, parfois plus lourd)
+
+Backend (Python)
+	•	fastapi + uvicorn
+	•	Usage : API REST + docs OpenAPI
+	•	sqlalchemy + alembic
+	•	Usage : ORM + migrations (schema évolutif)
+	•	Alternative : sqlmodel (plus simple, moins flexible)
+	•	psycopg (v3)
+	•	Usage : driver Postgres moderne
+	•	python-jose (ou pyjwt)
+	•	Usage : tokens magic-link / sessions
+	•	passlib[argon2]
+	•	Usage : si tu ajoutes mot de passe (optionnel)
+	•	celery + redis
+	•	Usage : jobs sync + recompute + awards
+	•	Alternative : rq (plus simple), dramatiq (clean)
+
+Ingestion Git
+	•	Option Python : GitPython
+	•	Usage : accéder à git log facilement
+	•	Limite : performance sur très gros repos
+	•	Option Rust (recommandée si scale) : git2 (libgit2 bindings)
+	•	Usage : extraction commits/diffs efficace
+	•	Alternative : CLI git log --numstat (simple, mais parsing fragile)
+
+Liens (à garder en code pour éviter markdown brut) :
+	•	https://www.npmjs.com/package/@tanstack/react-query
+	•	https://pypi.org/project/fastapi/
+	•	https://crates.io/crates/git2
+
+⸻
+
+3.3 Considérations techniques critiques
+
+⚡ Performance (objectifs mesurables)
+	•	Ingestion :
+	•	100k commits : < 5 min (objectif)
+	•	1M commits : < 30 min (avec worker Rust recommandé)
+	•	Leaderboards :
+	•	requêtes UI < 300ms sur 200 joueurs / 1M commits
+	•	Recompute saison :
+	•	job async + progress + verrouillage (éviter double recompute)
+
+🗄️ Stockage & croissance DB
+	•	Tables “raw” (commits) + tables “aggregates” (par player/période)
+	•	Stratégie :
+	•	conserver raw commits (nécessaire all-time/HOF)
+	•	recalculer aggregates via jobs (idempotents)
+	•	Index indispensables :
+	•	(repo_id, commit_date), (author_email_normalized), (season_id, player_id)
+
+🔐 Sécurité
+	•	Pas de code source stocké : uniquement métadonnées (sha, numstat, message)
+	•	Secrets repo :
+	•	stockés chiffrés (ex: Fernet) ou via variables Dokploy
+	•	RBAC strict :
+	•	endpoints commissioner protégés
+	•	Audit minimal :
+	•	approbations spectators, changements rules, lancement sync
+
+♻️ Updates & Déploiement
+	•	Docker images versionnées
+	•	Migrations Alembic au boot (avec lock)
+	•	“Maintenance mode” si migration cassante
+	•	CI/CD : GitHub Actions (lint, tests, build docker, security scan)
+
+⸻
+
+3.4 Modèle de données (V1 — tables principales)
+
+Core
+	•	users : id, email, role, status(approved/pending), created_at
+	•	git_identities : id, user_id, git_name, git_email_normalized
+	•	projects : id, name, slug
+	•	repos : id, project_id, name, remote, branch, last_sync_at, last_ingested_sha, status, error
+	•	commits : sha(pk or unique), repo_id, author_name, author_email_norm, commit_date, message_title, message_body,
+additions, deletions, files_changed, is_merge, parent_count
+
+League
+	•	seasons : id, project_id, name, start_at, end_at, status
+	•	absences : id, season_id, user_id, start_at, end_at, reason
+
+Aggregates (pré-calculés)
+	•	player_period_stats : season_id, period_type(day/week/month/season/all_time), period_start,
+user_id, commits, additions, deletions, pts, reb, ast, blk, stl, tov, impact_score
+
+Awards / Highlights
+	•	awards : season_id, period_type, period_start, award_type, user_id, score, metadata_json
+	•	plays : day(date), repo_id, sha, user_id, score, reason_json
+
+Fantasy
+	•	fantasy_leagues : season_id, name, roster_min, roster_max, lock_at
+	•	fantasy_participants : league_id, user_id
+	•	fantasy_rosters : league_id, user_id, created_at, locked_at
+	•	fantasy_roster_picks : roster_id, picked_user_id (unique per roster)
+
+---
+
+## 🎨 4) UX_GUIDELINES.md
+
+```markdown
+# 🎨 The Git League — UX Guidelines
+
+## 4.1 Principes de design
+
+- ⚡ **Speed first** : toute action (tri, filtre, navigation) donne un feedback <200ms.
+- 🧠 **Explainability** : chaque score NBA/award doit être “cliquable” → détail de calcul.
+- ⌨️ **Keyboard-centric** : Command Palette (⌘K) partout.
+- 👀 **Storytelling** : on ne montre pas juste des nombres → “Play of the day”, awards, records.
+- 🧩 **Enterprise-safe** : pas de fuites (pas de code), permissions visibles, pages protégées.
+
+---
+
+## 4.2 Flows utilisateurs clés
+
+### FLOW 1 — Setup d’un projet (Commissioner)
+1. User : ouvre **Settings → Projects**
+2. App : bouton “➕ New Project”
+3. User : crée projet + slug
+4. App : écran “Add Repos”
+5. User : ajoute repo (remote + branch + fréquence sync)
+6. App : “Sync now” + progression
+7. App : “Season wizard” → créer saison active
+8. App : page “Rules” pour régler coefficients NBA
+
+### FLOW 2 — Player login & association identité Git
+1. User : entre email
+2. App : envoie lien magique
+3. User : clique lien
+4. App : si email match des commits → associe automatiquement
+5. Sinon : App propose “Claim identity” (liste des emails Git détectés) + validation commissioner (option)
+
+### FLOW 3 — Consulter un Play of the Day
+1. User : va sur “Highlights”
+2. App : liste par jour (cards)
+3. User : ouvre une card
+4. App : montre détail commit (sha, repo, message, additions/deletions) + “score breakdown”
+5. User : clique auteur → profil joueur
+
+### FLOW 4 — Fantasy roster
+1. User : va sur “Fantasy”
+2. App : affiche pool draftable + règles (min/max + lock date)
+3. User : sélectionne 1..5 joueurs
+4. App : calcule score estimé + validation
+5. User : sauvegarde puis lock
+
+---
+
+## 4.3 Composants UI principaux
+
+### A) Global Shell (Top nav + command palette)
+- Topbar : Project switcher, Season switcher, Search, User menu
+- Command Palette : navigation + actions commissioner + help
+
+**Interactions**
+- ⌘K ouvre palette
+- Esc ferme
+- résultats keyboard-navigable
+
+---
+
+### B) Leaderboard (Ladder board)
+
+**Wireframe**
+```text
+┌──────────────────────────────────────────────────────────────┐
+│ 🏆 Leaderboard   [Project ▼] [Season ▼]   Metric: [PTS ▼]     │
+│ Filter: [Repo ▼] [Week/Month/Season ▼]     Search: [____]     │
+├──────────────────────────────────────────────────────────────┤
+│ #  Player                PTS   REB   AST   BLK   TOV  Trend   │
+│ 1  Alice "The Builder"   124   52    31    4     9    ↗︎      │
+│ 2  Bob "Cleanup King"    118   70    18    2     5    →      │
+│ 3  Chloé "Playmaker"     111   40    45    1     7    ↗︎      │
+└──────────────────────────────────────────────────────────────┘
+
+États
+	•	Vide : “No commits ingested yet” + CTA “Sync now” (commissioner)
+	•	Loading : skeleton rows
+	•	Error : message + bouton “View sync logs”
+
+⸻
+
+C) Profil joueur (“Player Card”)
+
+Wireframe
+
+┌──────────────────────────────────────────────────────────────┐
+│ Alice — SG   [Follow ☆]   Status: Active                     │
+│ Season: 2026 S1   Tabs: [1 Season] [2 Career] [3 Awards]     │
+├──────────────────────────────────────────────────────────────┤
+│ PTS 124  REB 52  AST 31  BLK 4  TOV 9   Impact 78            │
+│ Trend (weekly graph)                                         │
+├──────────────────────────────────────────────────────────────┤
+│ 🏅 Awards: Player of Week x2, MVP x1                          │
+│ 📌 Best Plays: [commit cards…]                                │
+└──────────────────────────────────────────────────────────────┘
+
+Interactions
+	•	Click métrique → ouvre breakdown (sources : commits, caps, coefficients)
+	•	Tabs via 1/2/3
+
+⸻
+
+D) Commissioner Console
+
+Wireframe
+
+┌──────────────────────────────────────────────────────────────┐
+│ ⚙️ Commissioner Console                                       │
+├──────────────────────────────────────────────────────────────┤
+│ Projects  Repos  Seasons  Rules  Access  Sync Logs           │
+├──────────────────────────────────────────────────────────────┤
+│ Repos: [repo-a] status: healthy  last sync: 10:32            │
+│       [repo-b] status: error    last sync: 09:10 [View logs] │
+│ [Sync now] [Recompute season]                                │
+└──────────────────────────────────────────────────────────────┘
+
+États
+	•	Logs paginés + filtre par repo + export JSON
+
+⸻
+
+4.4 Accessibilité
+	•	✅ Focus visible partout (shadcn + ring Tailwind)
+	•	✅ Navigation clavier complète (tab order logique + roving tabindex sur lists)
+	•	✅ Contraste WCAG AA
+	•	✅ Labels ARIA sur palette, dropdowns, graphiques (fallback tableau)
+
+---
+
+## 🚀 5) ROADMAP_AND_GTM.md
+
+```markdown
+# 🚀 The Git League — Roadmap & GTM
+
+## 5.1 Roadmap technique (timeline indicatif — solo dev)
+
+### Semaine 1–2 : Foundation ✅
+- [ ] Repo mono (frontend + backend) + Docker compose (Postgres/Redis)
+- [ ] Next.js + shadcn/ui + layout global + auth UI
+- [ ] FastAPI skeleton + OpenAPI + RBAC middleware
+- [ ] Schéma Postgres + Alembic migrations
+- [ ] Modèle Projects/Repos/Users/Git identities
+
+### Semaine 3–4 : Ingestion Git (Core) 🧱
+- [ ] Repo config + secrets (env/Dokploy)
+- [ ] Worker + queue (Celery/RQ)
+- [ ] Ingestion incrémentale + idempotence
+- [ ] Logs structurés + écran Sync status
+- [ ] Première agrégation “raw → player_period_stats”
+
+### Semaine 5–6 : League Engine 🏀
+- [ ] Saisons (CRUD + active)
+- [ ] Mapping NBA + coefficients configurables
+- [ ] Leaderboards (season/week/month) + performance indexes
+- [ ] Profils joueurs (season + career)
+
+### Semaine 7–8 : Awards + Highlights ✨
+- [ ] Player of week/month + MVP saison (jobs)
+- [ ] Play of the day (score composite + card UI)
+- [ ] Hall of Fame (all-time aggregates)
+- [ ] Retired players
+
+### Semaine 9–10 : Fantasy (V1) 🎮
+- [ ] Fantasy league entity + participants
+- [ ] Draft “pick list” (simple) + lock date
+- [ ] Fantasy leaderboard + pages roster
+
+### Semaine 11–12 : Hardening & OSS polish 🧼
+- [ ] Tests (API + jobs) + seed demo dataset
+- [ ] Rate limiting + audit minimal
+- [ ] Observabilité : logs JSON + healthchecks
+- [ ] Docs : README, self-host guide, env vars, screenshots
+- [ ] GitHub Actions : lint/test/build docker + release tags
+
+---
+
+## 5.2 Go-To-Market Strategy (Open Source + Self-host)
+
+### Positionnement produit
+- **Tagline** : “Turn your Git into an NBA season.”
+- **Elevator pitch (30s)** :
+  “The Git League ingère vos commits et les transforme en league NBA : leaderboards, awards, plays du jour et fantasy league — entièrement self-hosted. Parfait pour animer une équipe sans exposer le code à un SaaS.”
+
+### ICP (idéal)
+- Équipes 5–200 devs
+- Culture craft/engineering + envie de fun (rituels hebdo)
+- Contraintes privacy (banques, santé, infra interne)
+
+### Canaux
+1. **GitHub (OSS)**
+   - README béton + GIF + “Quickstart Docker”
+   - “Demo mode” (dataset inclus)
+2. **HackerNews — Show HN**
+   - Angle : “self-hosted + fun + explainable metrics”
+3. **Reddit**
+   - r/selfhosted, r/devops, r/programming, r/opensource
+4. **Dev.to / Medium**
+   - Article : “How I turned git history into an NBA fantasy league”
+5. **Communautés**
+   - Discord dev, Slack internes, plateformes engineering
+
+### Distribution “enterprise-friendly”
+- Docker images signées (phase 2)
+- Helm chart (phase 2)
+- Documentation “Air-gapped friendly”
+
+---
+
+## 5.3 Analyse concurrentielle
+
+| Concurrent | Prix | Forces | Faiblesses | Notre avantage |
+|-----------|------|--------|------------|----------------|
+| GitHub Insights / Pulse | Inclus | Facile, intégré | Peu fun, peu custom | Gamification + saisons + fantasy |
+| GitLab Analytics | Inclus | Metrics standard | UX lourde, pas narrative | Explainability + awards + HOF |
+| Outils “Dev productivity” SaaS | $$$ | Dashboards riches | Données externalisées | Self-host + privacy + fun |
+| Tableaux maison (BI) | Temps | Sur-mesure | Coût maintenance, pas jeu | Packagé + prêt à déployer |
+
+**Positionnement compétitif**
+- On n’essaie pas de “mesurer la productivité” au sens HR.
+- On fait une **league** : transparence, célébration, narration, et contrôle (coefficients + exclusions).
+
+---
+
+## 5.4 Métriques de succès (OSS)
+
+### Semaine 1 (après release v0.1)
+- 200 ⭐ GitHub
+- 20 installs “réelles” (issues/discussions)
+- 5 retours sur scoring (coeffs)
+
+### Mois 1 (v1.0)
+- 1k ⭐ GitHub
+- 100 installs
+- 10 contributions externes (PR/docs)
+- < 1h “time-to-first-leaderboard” (objectif UX)
+
+### Mois 3
+- 3k ⭐ GitHub
+- 300 installs
+- 3 intégrations demandées de façon répétée (signal roadmap)
+- Taux de rétention : 50% des installs actives (sync hebdo)
+
+---
+
+## Annexes — Score composite “Play of the Day” (V1)
+Proposition déterministe (explainable) :
+- base = `pts * 1.0 + reb * 0.6 + ast * 0.8 + blk * 1.2 - tov * 0.7`
+- bonus :
+  - +X si message “fix/bug” (blk)
+  - -X si “wip/tmp”
+- exclusions optionnelles :
+  - merges
+  - commits > cap additions/deletions (anti “spam diff”)
+
+
+⸻
+
+Si tu veux, je peux aussi te générer un schéma SQL V1 complet (Postgres) + un plan d’API endpoints FastAPI (routes + DTO Zod) aligné sur ces docs.
