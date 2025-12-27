@@ -15,11 +15,14 @@ from app.schemas.user import (
 from app.services.auth import auth_service
 from app.api.deps import get_current_user
 from app.models.user import User
+from app.core.rate_limit import limiter
+from app.core.config import settings
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
 @router.post("/magic-link", response_model=MagicLinkResponse)
+@limiter.limit(f"{settings.RATE_LIMIT_MAGIC_LINK}/minute")
 async def request_magic_link(
     request_data: MagicLinkRequest,
     request: Request,
@@ -34,6 +37,8 @@ async def request_magic_link(
 
     If the user doesn't exist, they will be created with PLAYER role.
     The first user in the system is automatically promoted to COMMISSIONER.
+
+    **Rate Limit:** 5 requests per minute per IP address
     """
     # Get base URL from request
     base_url = f"{request.url.scheme}://{request.url.netloc}"

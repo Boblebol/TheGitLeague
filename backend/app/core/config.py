@@ -30,12 +30,19 @@ class Settings(BaseSettings):
 
     # Security
     SECRET_KEY: str = "dev-secret-key-change-in-production-min-32-chars"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24 hours
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 120  # 2 hours (reduced from 24h for security)
     MAGIC_LINK_EXPIRE_MINUTES: int = 15
     FERNET_KEY: str = ""
 
+    # Security Features
+    ENABLE_RATE_LIMITING: bool = True
+    RATE_LIMIT_PER_MINUTE: int = 100  # General API rate limit per IP
+    RATE_LIMIT_MAGIC_LINK: int = 5    # Magic link requests per minute per IP
+    ENABLE_SECURITY_HEADERS: bool = True
+
     # CORS
     CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://frontend:3000"]
+    CORS_ALLOW_CREDENTIALS: bool = True
 
     # Email
     SMTP_HOST: str = "localhost"

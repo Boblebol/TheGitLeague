@@ -32,5 +32,8 @@ GitPython==3.1.41
 # HTTP client
 httpx==0.26.0
 
+# Security
+slowapi==0.1.9
+
 # Utils
 python-dotenv==1.0.0

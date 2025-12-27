@@ -6,6 +6,9 @@ from fastapi.responses import JSONResponse
 
 from app.core.config import settings
 from app.api.v1 import api_router
+from app.middleware.security import SecurityHeadersMiddleware
+from app.core.rate_limit import limiter, rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 # Create FastAPI application
 app = FastAPI(
@@ -16,14 +19,29 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-# Configure CORS
+# Add security headers middleware
+app.add_middleware(SecurityHeadersMiddleware)
+
+# Configure CORS (restricted for security)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_credentials=settings.CORS_ALLOW_CREDENTIALS,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],  # Restricted from wildcard
+    allow_headers=[
+        "Content-Type",
+        "Authorization",
+        "X-Requested-With",
+        "Accept",
+        "Origin",
+    ],  # Restricted from wildcard
+    expose_headers=["Content-Range", "X-Total-Count"],
 )
+
+# Add rate limiting
+if settings.ENABLE_RATE_LIMITING:
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 
 # Include API routes
 app.include_router(api_router, prefix="/api/v1")
