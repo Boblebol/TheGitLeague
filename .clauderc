@@ -1,0 +1,271 @@
+# Claude Code Configuration for The Git League
+
+## Project Context
+
+**Project Name:** The Git League
+**Type:** Self-hosted web application
+**Purpose:** Transform Git commit history into an NBA-style competitive league with stats, leaderboards, awards, and fantasy leagues
+
+**Tech Stack:**
+- Frontend: Next.js 14 (App Router), TypeScript, Tailwind CSS, shadcn/ui
+- Backend: Python 3.11+, FastAPI, SQLAlchemy, PostgreSQL
+- Workers: Celery/RQ, Redis
+- Deployment: Docker Compose
+
+## Development Guidelines
+
+### Code Style
+
+**Frontend (TypeScript/React):**
+- Use TypeScript strictly (avoid `any`)
+- Functional components with hooks
+- Use shadcn/ui components (don't reinvent UI)
+- Tailwind for styling (avoid custom CSS)
+- File naming: PascalCase for components, camelCase for utilities
+- Always provide proper TypeScript types
+
+**Backend (Python):**
+- Follow PEP 8 style guide
+- Use type hints everywhere
+- Pydantic for validation
+- SQLAlchemy for ORM
+- snake_case for functions and variables
+- Docstrings for all public functions
+
+### Architecture Principles
+
+1. **Privacy-first:** Never store source code, only metadata (SHA, stats, messages)
+2. **Explainability:** All metrics must be transparent and configurable
+3. **Self-contained:** No external SaaS dependencies
+4. **Scalable:** Design for millions of commits
+5. **Maintainable:** Clear separation of concerns
+
+### File Structure
+
+**Frontend:**
+- `frontend/src/app/` — Next.js pages (App Router)
+- `frontend/src/components/` — Reusable React components
+- `frontend/src/lib/` — Utilities and API client
+- `frontend/src/types/` — TypeScript type definitions
+
+**Backend:**
+- `backend/app/api/v1/` — API route handlers
+- `backend/app/core/` — Business logic (league engine, scoring)
+- `backend/app/models/` — SQLAlchemy ORM models
+- `backend/app/schemas/` — Pydantic request/response schemas
+- `backend/app/services/` — Service layer (business logic)
+- `backend/app/workers/` — Celery background tasks
+
+### Database
+
+**Primary Database:** PostgreSQL 15+
+**Cache/Queue:** Redis 7+
+
+**Migration Strategy:**
+- Use Alembic for all schema changes
+- Never modify models without creating a migration
+- Always include both `upgrade()` and `downgrade()`
+- Test migrations on sample data before committing
+
+### API Design
+
+**REST Principles:**
+- Resource-oriented endpoints: `/api/v1/players/{id}`
+- Proper HTTP methods: GET, POST, PUT/PATCH, DELETE
+- Proper status codes: 200, 201, 400, 401, 403, 404, 500
+- Pagination on all list endpoints: `?page=1&limit=50`
+- JWT authentication via Bearer token
+
+### Testing Requirements
+
+**Frontend:**
+- Unit tests for utilities and hooks
+- Component tests for complex UI logic
+- Jest + React Testing Library
+
+**Backend:**
+- Unit tests for services and business logic
+- API endpoint integration tests
+- pytest + httpx
+- Minimum 80% coverage for core logic
+
+### Security Considerations
+
+1. **No source code storage** — Only commit metadata
+2. **Encrypted secrets** — Repository credentials encrypted at rest
+3. **Input validation** — All inputs validated via Pydantic
+4. **Rate limiting** — API rate limits enforced
+5. **RBAC** — Role-based access control (Commissioner, Player, Spectator)
+
+### Performance Targets
+
+- **Ingestion:** 100k commits < 5 minutes
+- **Leaderboards:** < 300ms response time for 200 players / 1M commits
+- **API responses:** < 200ms for most endpoints
+
+### Git Workflow
+
+**Branch Naming:**
+- `feature/` — New features
+- `fix/` — Bug fixes
+- `docs/` — Documentation
+- `refactor/` — Code refactoring
+- `test/` — Testing updates
+
+**Commit Messages:**
+Use Conventional Commits format:
+```
+<type>(<scope>): <subject>
+
+<body>
+
+<footer>
+```
+
+Types: feat, fix, docs, style, refactor, perf, test, chore
+
+### Key Features (V1 MVP)
+
+1. **Multi-repo Git ingestion** — Incremental, idempotent
+2. **NBA-style metrics** — PTS, REB, AST, BLK, STL, TOV (configurable)
+3. **Seasons & periods** — Weekly, monthly, seasonal stats
+4. **RBAC** — Commissioner, Player, Spectator roles
+5. **Leaderboards** — Sortable, filterable rankings
+6. **Player profiles** — Career stats, awards, progression
+7. **Automated awards** — Player of Week/Month, MVP, Most Improved
+8. **Play of the Day** — Best commit highlights
+9. **Fantasy league** — Draft system with roster locking
+10. **Hall of Fame** — All-time records and retired players
+
+### Scoring Engine Logic
+
+**NBA Metrics (V1 heuristics):**
+- **PTS (Points):** Base + capped additions * weight
+- **REB (Rebounds):** Capped deletions * weight (cleanup)
+- **AST (Assists):** Multi-file commits (collaboration proxy)
+- **BLK (Blocks):** Detected fixes/reverts (message heuristics)
+- **TOV (Turnovers):** WIP/debug commits (penalties)
+
+All coefficients are configurable per project and transparent.
+
+### Important Files
+
+- `README.md` — Project overview and quick start
+- `DEVELOPMENT.md` — Development setup guide
+- `ARCHITECTURE.md` — Technical architecture documentation
+- `API_SPEC.md` — REST API specification
+- `CONTRIBUTING.md` — Contribution guidelines
+- `Base doc` — Original product requirements document
+
+### Docker Services
+
+**Development stack:**
+- `postgres` — PostgreSQL database (port 5432)
+- `redis` — Redis cache/queue (port 6379)
+- `backend` — FastAPI application (port 8000)
+- `frontend` — Next.js application (port 3000)
+- `worker` — Celery worker (background jobs)
+- `beat` — Celery beat scheduler
+- `mailhog` — Email testing (port 8025)
+
+### Common Commands
+
+**Frontend:**
+```bash
+cd frontend
+pnpm install
+pnpm dev          # Start dev server
+pnpm build        # Build for production
+pnpm test         # Run tests
+pnpm lint         # Lint code
+```
+
+**Backend:**
+```bash
+cd backend
+pip install -r requirements.txt
+uvicorn app.main:app --reload  # Start dev server
+pytest                         # Run tests
+alembic upgrade head          # Apply migrations
+```
+
+**Docker:**
+```bash
+docker-compose up -d           # Start all services
+docker-compose logs -f backend # View logs
+docker-compose down            # Stop services
+```
+
+### Environment Variables
+
+Required environment variables (see `.env.example`):
+- `POSTGRES_*` — Database connection
+- `REDIS_*` — Redis connection
+- `SECRET_KEY` — JWT secret (min 32 chars)
+- `NEXT_PUBLIC_API_URL` — API base URL
+
+### Anti-Patterns to Avoid
+
+❌ **Don't:**
+- Store source code or file contents
+- Use `any` type in TypeScript
+- Skip migrations for database changes
+- Hardcode configuration values
+- Over-engineer simple features
+- Add features not in the PRD
+- Skip tests for core functionality
+
+✅ **Do:**
+- Keep metrics transparent and explainable
+- Use pre-aggregated stats tables for performance
+- Follow the three-tier architecture (frontend, backend, workers)
+- Write idempotent background jobs
+- Validate all inputs with Pydantic/Zod
+- Document complex business logic
+
+### Documentation Standards
+
+**Code Comments:**
+- Explain WHY, not WHAT
+- Document complex algorithms
+- Add TODO comments for future improvements
+
+**API Documentation:**
+- FastAPI auto-generates OpenAPI docs
+- Keep API_SPEC.md updated for major changes
+- Include request/response examples
+
+**Docstrings:**
+```python
+def calculate_nba_points(commit: Commit, coefficients: ScoringCoefficients) -> int:
+    """
+    Calculate NBA-style points for a commit.
+
+    Points are based on capped additions weighted by a coefficient,
+    plus a base value per commit. This prevents massive auto-generated
+    changes from dominating the leaderboard.
+
+    Args:
+        commit: The commit to score
+        coefficients: Project-specific scoring configuration
+
+    Returns:
+        Integer point value (0-1000 range)
+    """
+```
+
+### Resources
+
+- [FastAPI Documentation](https://fastapi.tiangolo.com/)
+- [Next.js Documentation](https://nextjs.org/docs)
+- [SQLAlchemy Documentation](https://docs.sqlalchemy.org/)
+- [shadcn/ui Components](https://ui.shadcn.com/)
+- [Conventional Commits](https://www.conventionalcommits.org/)
+
+---
+
+**For detailed instructions, see:**
+- Setup: `DEVELOPMENT.md`
+- Architecture: `ARCHITECTURE.md`
+- API: `API_SPEC.md`
+- Contributing: `CONTRIBUTING.md`
