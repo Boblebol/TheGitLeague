@@ -97,6 +97,7 @@ open http://localhost:3000
 
 - [**Development Guide**](./DEVELOPMENT.md) — Setup dev environment, architecture, stack
 - [**Email Setup Guide**](./EMAIL_SETUP.md) — Configure email providers for magic link authentication
+- [**Security Audit**](./SECURITY.md) — Security measures, vulnerabilities, and recommendations
 - [**Contributing**](./CONTRIBUTING.md) — How to contribute to the project
 - [**Architecture**](./ARCHITECTURE.md) — Technical design and data models
 - [**API Specification**](./API_SPEC.md) — REST API endpoints and schemas
@@ -236,6 +237,7 @@ See full [Roadmap](./Base%20doc#ROADMAP_AND_GTM) for details.
 - ✅ **RBAC enforcement** — Role-based access control on all endpoints
 - ✅ **Audit logs** — Track approvals, rule changes, sync operations
 - ✅ **Self-hosted** — Complete control over your data
+- 📋 **Security Audit** — See [SECURITY.md](./SECURITY.md) for detailed security analysis and recommendations
 
 ---
 
