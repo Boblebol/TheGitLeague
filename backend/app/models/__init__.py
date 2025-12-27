@@ -11,6 +11,7 @@ from app.models.user import (
 from app.models.project import (
     Project,
     Repository,
+    ProjectConfig,
     RemoteType,
     RepoStatus,
 )
@@ -25,6 +26,7 @@ __all__ = [
     "UserStatus",
     "Project",
     "Repository",
+    "ProjectConfig",
     "RemoteType",
     "RepoStatus",
     "Commit",

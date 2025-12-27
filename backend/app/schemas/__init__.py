@@ -31,6 +31,13 @@ from app.schemas.commit import (
     CommitListResponse,
     CommitStatsResponse,
 )
+from app.schemas.scoring import (
+    ScoringCoefficientsSchema,
+    ProjectConfigResponse,
+    ProjectConfigUpdate,
+    CommitMetricsResponse,
+    CommitMetricsBreakdown,
+)
 
 __all__ = [
     "GitIdentityCreate",
@@ -58,4 +65,9 @@ __all__ = [
     "CommitResponse",
     "CommitListResponse",
     "CommitStatsResponse",
+    "ScoringCoefficientsSchema",
+    "ProjectConfigResponse",
+    "ProjectConfigUpdate",
+    "CommitMetricsResponse",
+    "CommitMetricsBreakdown",
 ]

@@ -56,6 +56,9 @@ class Project(Base):
     repos: Mapped[List["Repository"]] = relationship(
         "Repository", back_populates="project", cascade="all, delete-orphan"
     )
+    config: Mapped[Optional["ProjectConfig"]] = relationship(
+        "ProjectConfig", back_populates="project", uselist=False, cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<Project {self.name} ({self.slug})>"
@@ -97,3 +100,40 @@ class Repository(Base):
 
     def __repr__(self) -> str:
         return f"<Repository {self.name} ({self.status})>"
+
+
+class ProjectConfig(Base):
+    """Project configuration model - scoring coefficients and settings."""
+
+    __tablename__ = "project_configs"
+
+    project_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("projects.id", ondelete="CASCADE"), primary_key=True
+    )
+
+    # Scoring coefficients (stored as JSON)
+    scoring_coefficients: Mapped[dict] = mapped_column(
+        Text,
+        nullable=False,
+        default=lambda: str({
+            "additions_weight": 1.0,
+            "deletions_weight": 0.6,
+            "commit_base": 10,
+            "multi_file_bonus": 5,
+            "fix_bonus": 15,
+            "wip_penalty": -10,
+            "max_additions_cap": 1000,
+            "max_deletions_cap": 1000,
+        })
+    )
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
+
+    # Relationships
+    project: Mapped["Project"] = relationship("Project", back_populates="config")
+
+    def __repr__(self) -> str:
+        return f"<ProjectConfig for project {self.project_id}>"
