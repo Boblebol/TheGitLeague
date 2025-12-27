@@ -16,6 +16,11 @@ from app.models.project import (
     RepoStatus,
 )
 from app.models.commit import Commit
+from app.models.season import (
+    Season,
+    Absence,
+    SeasonStatus,
+)
 
 __all__ = [
     "User",
@@ -30,4 +35,7 @@ __all__ = [
     "RemoteType",
     "RepoStatus",
     "Commit",
+    "Season",
+    "Absence",
+    "SeasonStatus",
 ]

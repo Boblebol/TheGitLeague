@@ -59,6 +59,9 @@ class Project(Base):
     config: Mapped[Optional["ProjectConfig"]] = relationship(
         "ProjectConfig", back_populates="project", uselist=False, cascade="all, delete-orphan"
     )
+    seasons: Mapped[List["Season"]] = relationship(
+        "Season", back_populates="project", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<Project {self.name} ({self.slug})>"

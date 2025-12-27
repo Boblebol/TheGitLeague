@@ -38,6 +38,15 @@ from app.schemas.scoring import (
     CommitMetricsResponse,
     CommitMetricsBreakdown,
 )
+from app.schemas.season import (
+    SeasonCreate,
+    SeasonUpdate,
+    SeasonResponse,
+    SeasonActivateRequest,
+    AbsenceCreate,
+    AbsenceUpdate,
+    AbsenceResponse,
+)
 
 __all__ = [
     "GitIdentityCreate",
@@ -70,4 +79,11 @@ __all__ = [
     "ProjectConfigUpdate",
     "CommitMetricsResponse",
     "CommitMetricsBreakdown",
+    "SeasonCreate",
+    "SeasonUpdate",
+    "SeasonResponse",
+    "SeasonActivateRequest",
+    "AbsenceCreate",
+    "AbsenceUpdate",
+    "AbsenceResponse",
 ]
