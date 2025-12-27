@@ -47,6 +47,13 @@ from app.schemas.season import (
     AbsenceUpdate,
     AbsenceResponse,
 )
+from app.schemas.leaderboard import (
+    PlayerPeriodStatsBase,
+    PlayerPeriodStatsResponse,
+    PlayerInfo,
+    LeaderboardEntry,
+    LeaderboardResponse,
+)
 
 __all__ = [
     "GitIdentityCreate",
@@ -86,4 +93,9 @@ __all__ = [
     "AbsenceCreate",
     "AbsenceUpdate",
     "AbsenceResponse",
+    "PlayerPeriodStatsBase",
+    "PlayerPeriodStatsResponse",
+    "PlayerInfo",
+    "LeaderboardEntry",
+    "LeaderboardResponse",
 ]

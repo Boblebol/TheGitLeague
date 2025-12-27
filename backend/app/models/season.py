@@ -53,6 +53,9 @@ class Season(Base):
     absences: Mapped[List["Absence"]] = relationship(
         "Absence", back_populates="season", cascade="all, delete-orphan"
     )
+    period_stats: Mapped[List["PlayerPeriodStats"]] = relationship(
+        "PlayerPeriodStats", back_populates="season", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<Season {self.name} ({self.status})>"

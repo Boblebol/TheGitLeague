@@ -21,6 +21,7 @@ from app.models.season import (
     Absence,
     SeasonStatus,
 )
+from app.models.leaderboard import PlayerPeriodStats
 
 __all__ = [
     "User",
@@ -38,4 +39,5 @@ __all__ = [
     "Season",
     "Absence",
     "SeasonStatus",
+    "PlayerPeriodStats",
 ]
