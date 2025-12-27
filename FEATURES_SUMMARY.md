@@ -1774,6 +1774,382 @@ def get_all_time_leaderboard(
 
 ---
 
+### Feature L: Commit Quality Tracking
+
+**Priority:** Should-Have
+**Timeline:** Week 9-10 (Enhancement)
+**Owner:** Backend + Commissioner Tools
+
+#### Description
+Track commit quality metrics to reward good development practices. Two new NBA-style stats: **Jira Tracking (JT)** for commits with ticket references, and **Clean Commits (CC)** for well-formatted commits. Both metrics contribute positively to the Impact Score.
+
+#### User Stories
+
+**As a Commissioner:**
+- I want to configure Jira ticket regex, so commits with tickets get bonus points
+- I want to define clean commit rules, so poor commit messages are not rewarded
+- I want to adjust quality coefficients, so I can balance quality vs quantity
+- I want to recalculate historical stats, so changes apply retroactively
+
+**As a Player:**
+- I want bonus points for referencing Jira tickets, so I'm motivated to track work
+- I want bonus points for clean commits, so I'm encouraged to write good messages
+- I want to see my quality percentage, so I can improve my habits
+
+#### Technical Implementation
+
+**Configuration Model:**
+```sql
+CREATE TABLE commit_quality_config (
+    project_id VARCHAR(36) PRIMARY KEY REFERENCES projects(id),
+    version INTEGER DEFAULT 1,  -- Auto-increment on each update
+
+    -- Jira Tracking Config
+    jira_regex VARCHAR(255) DEFAULT '[A-Z]+-\d+',  -- e.g., "PROJ-123"
+    jira_enabled BOOLEAN DEFAULT true,
+    jira_points_per_commit FLOAT DEFAULT 2.0,
+
+    -- Clean Commits Config
+    clean_blacklist_regex VARCHAR(500) DEFAULT '(WIP|tmp|fix typo|debug|test|oops)',
+    clean_enabled BOOLEAN DEFAULT true,
+    clean_points_per_commit FLOAT DEFAULT 1.5,
+
+    -- Impact Score Coefficients
+    jt_impact_coefficient FLOAT DEFAULT 0.5,  -- How much JT contributes to impact
+    cc_impact_coefficient FLOAT DEFAULT 0.3,  -- How much CC contributes to impact
+
+    -- Audit
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
+    updated_by_user_id VARCHAR(36) REFERENCES users(id)
+);
+```
+
+**Commit Quality Columns:**
+```sql
+-- Add to commits table
+ALTER TABLE commits ADD COLUMN jira_tracked BOOLEAN DEFAULT false;
+ALTER TABLE commits ADD COLUMN is_clean BOOLEAN DEFAULT true;
+ALTER TABLE commits ADD COLUMN jt_points FLOAT DEFAULT 0.0;
+ALTER TABLE commits ADD COLUMN cc_points FLOAT DEFAULT 0.0;
+ALTER TABLE commits ADD COLUMN quality_calculated_at TIMESTAMP;
+ALTER TABLE commits ADD COLUMN quality_config_version INTEGER DEFAULT 0;
+```
+
+**PlayerPeriodStats Quality Metrics:**
+```sql
+-- Add to player_period_stats table
+ALTER TABLE player_period_stats ADD COLUMN jira_tracked_count INTEGER DEFAULT 0;
+ALTER TABLE player_period_stats ADD COLUMN clean_commits_count INTEGER DEFAULT 0;
+ALTER TABLE player_period_stats ADD COLUMN jt FLOAT DEFAULT 0.0;
+ALTER TABLE player_period_stats ADD COLUMN cc FLOAT DEFAULT 0.0;
+```
+
+**Quality Calculation:**
+```python
+import re
+from datetime import datetime
+
+def calculate_commit_quality(
+    commit: Commit,
+    config: CommitQualityConfig
+) -> dict:
+    """
+    Calculate quality metrics for a commit.
+
+    Returns:
+        {
+            'jira_tracked': bool,
+            'is_clean': bool,
+            'jt_points': float,
+            'cc_points': float,
+        }
+    """
+    message = commit.message_title + " " + (commit.message_body or "")
+
+    # Jira Tracking
+    jira_tracked = False
+    jt_points = 0.0
+    if config.jira_enabled and config.jira_regex:
+        if re.search(config.jira_regex, message, re.IGNORECASE):
+            jira_tracked = True
+            jt_points = config.jira_points_per_commit
+
+    # Clean Commits (blacklist approach)
+    is_clean = True
+    cc_points = 0.0
+    if config.clean_enabled and config.clean_blacklist_regex:
+        if re.search(config.clean_blacklist_regex, message, re.IGNORECASE):
+            is_clean = False
+        else:
+            cc_points = config.clean_points_per_commit
+
+    return {
+        'jira_tracked': jira_tracked,
+        'is_clean': is_clean,
+        'jt_points': jt_points,
+        'cc_points': cc_points,
+    }
+```
+
+**Updated Impact Score Formula:**
+```python
+def calculate_impact_score(stats: PlayerPeriodStats, config: CommitQualityConfig) -> float:
+    """
+    Calculate impact score with quality bonus.
+
+    Original formula:
+        impact = pts * 1.0 + reb * 0.8 + ast * 1.0 + blk * 1.5 - abs(tov) * 1.0
+
+    With quality bonus:
+        impact = (original) + jt * 0.5 + cc * 0.3
+    """
+    base_impact = (
+        stats.pts * 1.0 +
+        stats.reb * 0.8 +
+        stats.ast * 1.0 +
+        stats.blk * 1.5 -
+        abs(stats.tov) * 1.0
+    )
+
+    quality_bonus = (
+        stats.jt * config.jt_impact_coefficient +
+        stats.cc * config.cc_impact_coefficient
+    )
+
+    return base_impact + quality_bonus
+```
+
+**Recalculation Job (Celery):**
+```python
+@celery_app.task(bind=True)
+def recalculate_commit_quality_stats(
+    self,
+    project_id: str,
+    scope: str = "all",
+    season_ids: list = None,
+    from_date: str = None,
+    to_date: str = None,
+):
+    """
+    Recalculate quality stats for commits.
+
+    Steps:
+    1. Fetch commits in scope
+    2. Fetch current quality config
+    3. Recalculate JT/CC for each commit (batch of 1000)
+    4. Reaggregate PlayerPeriodStats
+    5. Recalculate impact scores
+    """
+    with get_db_context() as db:
+        # Get config
+        config = get_commit_quality_config(project_id, db)
+
+        # Build query
+        query = db.query(Commit).join(Repository).filter(
+            Repository.project_id == project_id
+        )
+
+        if scope == "season" and season_ids:
+            # Join with commits_seasons or filter by date range
+            pass
+        elif scope == "date_range":
+            query = query.filter(
+                Commit.commit_date >= from_date,
+                Commit.commit_date <= to_date
+            )
+
+        commits = query.all()
+        total = len(commits)
+
+        # Process in batches
+        for i in range(0, total, 1000):
+            batch = commits[i:i+1000]
+
+            for commit in batch:
+                quality = calculate_commit_quality(commit, config)
+                commit.jira_tracked = quality['jira_tracked']
+                commit.is_clean = quality['is_clean']
+                commit.jt_points = quality['jt_points']
+                commit.cc_points = quality['cc_points']
+                commit.quality_calculated_at = datetime.utcnow()
+                commit.quality_config_version = config.version
+
+            db.commit()
+
+            # Progress
+            self.update_state(
+                state='PROGRESS',
+                meta={
+                    'current': min(i + 1000, total),
+                    'total': total,
+                    'percent': int(min(i + 1000, total) / total * 100)
+                }
+            )
+
+        # Reaggregate stats
+        reaggregate_player_period_stats(project_id, db)
+
+        return {'status': 'completed', 'commits_processed': total}
+```
+
+#### API Endpoints
+
+**Get Quality Config:**
+```http
+GET /api/v1/projects/{project_id}/commit-quality-config
+
+Response 200:
+{
+    "project_id": "proj-123",
+    "version": 3,
+    "jira_regex": "[A-Z]+-\\d+",
+    "jira_enabled": true,
+    "jira_points_per_commit": 2.0,
+    "clean_blacklist_regex": "(WIP|tmp|fix typo|debug)",
+    "clean_enabled": true,
+    "clean_points_per_commit": 1.5,
+    "jt_impact_coefficient": 0.5,
+    "cc_impact_coefficient": 0.3,
+    "updated_at": "2024-12-27T10:30:00Z"
+}
+```
+
+**Update Quality Config:**
+```http
+PUT /api/v1/projects/{project_id}/commit-quality-config
+Authorization: Bearer <commissioner-token>
+
+Request:
+{
+    "jira_regex": "[A-Z]{2,}-\\d+",
+    "jira_points_per_commit": 3.0,
+    "clean_blacklist_regex": "(WIP|tmp|fuck|shit)",
+    "jt_impact_coefficient": 0.7
+}
+
+Response 200:
+{
+    "message": "Configuration updated",
+    "version": 4,
+    "changes_detected": true,
+    "affected_commits": 15234,
+    "recalculation_recommended": true
+}
+```
+
+**Recalculate Quality Stats:**
+```http
+POST /api/v1/projects/{project_id}/recalculate-quality-stats
+Authorization: Bearer <commissioner-token>
+
+Request:
+{
+    "scope": "all",  // "all", "season", "date_range"
+    "season_ids": ["season-1"],  // Optional
+    "from_date": "2024-01-01",   // Optional
+    "to_date": "2024-12-31",     // Optional
+    "async": true
+}
+
+Response 202:
+{
+    "job_id": "recalc-uuid-123",
+    "status": "queued",
+    "estimated_duration_seconds": 45,
+    "commits_to_process": 15234
+}
+```
+
+**Get Recalculation Status:**
+```http
+GET /api/v1/jobs/{job_id}
+
+Response 200:
+{
+    "job_id": "recalc-uuid-123",
+    "status": "in_progress",  // "queued", "in_progress", "completed", "failed"
+    "progress": {
+        "current": 9500,
+        "total": 15234,
+        "percent": 62
+    },
+    "started_at": "2024-12-27T10:35:00Z",
+    "estimated_completion": "2024-12-27T10:36:30Z"
+}
+```
+
+#### Examples
+
+**Example 1: Perfect Commit**
+```
+Message: "feat(auth): implement magic link authentication PROJ-123"
+```
+- ✅ Jira Tracked: `PROJ-123` found → +2.0 JT points
+- ✅ Clean Commit: No blacklist words → +1.5 CC points
+- **Quality Bonus: +3.5 points to impact score**
+
+**Example 2: Jira but Not Clean**
+```
+Message: "WIP: add login FEAT-456"
+```
+- ✅ Jira Tracked: `FEAT-456` found → +2.0 JT points
+- ❌ Clean Commit: "WIP" in blacklist → 0 CC points
+- **Quality Bonus: +2.0 points**
+
+**Example 3: Clean but No Jira**
+```
+Message: "docs: update README with installation steps"
+```
+- ❌ Jira Tracked: No ticket → 0 JT points
+- ✅ Clean Commit: Professional message → +1.5 CC points
+- **Quality Bonus: +1.5 points**
+
+**Example 4: Poor Quality**
+```
+Message: "fix typo lol"
+```
+- ❌ Jira Tracked: No ticket → 0 JT points
+- ❌ Clean Commit: "fix typo" in blacklist → 0 CC points
+- **Quality Bonus: 0 points**
+
+#### Acceptance Criteria
+
+- [x] Commissioner can configure Jira regex per project
+- [x] Commissioner can configure clean commit blacklist
+- [x] Commissioner can adjust quality coefficients
+- [x] Config changes trigger recalculation recommendation
+- [x] Recalculation runs asynchronously (Celery)
+- [x] Recalculation shows progress
+- [x] Quality metrics included in PlayerPeriodStats
+- [x] Quality metrics visible in leaderboards
+- [x] Impact score includes quality bonus
+- [x] Config versioning tracks changes
+
+#### Edge Cases
+
+- **Empty Regex:** If regex is empty/null, feature is disabled
+- **Invalid Regex:** Validate regex syntax before saving
+- **Recalculation During Sync:** Lock to prevent conflicts
+- **Large Projects (100k+ commits):** Batch processing with progress
+- **Config Rollback:** Keep history for audit, allow reverting
+- **Case Sensitivity:** Use IGNORECASE flag for all regex matching
+
+#### Performance
+
+**Recalculation Performance:**
+- 10k commits: ~10 seconds
+- 100k commits: ~1 minute
+- 1M commits: ~10 minutes
+
+**Optimization:**
+- Batch processing (1000 commits/batch)
+- Indexed columns for aggregation
+- Celery task with progress tracking
+- Option to recalculate only active season
+
+---
+
 ## Phase 2: Enhancement Features (V2.0)
 
 ### Search & Discovery
