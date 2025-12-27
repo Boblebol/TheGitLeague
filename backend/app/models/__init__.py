@@ -23,6 +23,12 @@ from app.models.season import (
 )
 from app.models.leaderboard import PlayerPeriodStats
 from app.models.award import Award, PlayOfTheDay, AwardType
+from app.models.fantasy import (
+    FantasyLeague,
+    FantasyParticipant,
+    FantasyRoster,
+    FantasyRosterPick,
+)
 
 __all__ = [
     "User",
@@ -44,4 +50,8 @@ __all__ = [
     "Award",
     "PlayOfTheDay",
     "AwardType",
+    "FantasyLeague",
+    "FantasyParticipant",
+    "FantasyRoster",
+    "FantasyRosterPick",
 ]

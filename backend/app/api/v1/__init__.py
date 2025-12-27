@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from app.api.v1 import auth, users, projects, repos, commits, scoring, seasons, leaderboard, players, awards, hall_of_fame
+from app.api.v1 import auth, users, projects, repos, commits, scoring, seasons, leaderboard, players, awards, hall_of_fame, fantasy
 
 api_router = APIRouter()
 
@@ -18,3 +18,4 @@ api_router.include_router(leaderboard.router)
 api_router.include_router(players.router)
 api_router.include_router(awards.router)
 api_router.include_router(hall_of_fame.router)
+api_router.include_router(fantasy.router)

@@ -75,6 +75,15 @@ from app.schemas.hall_of_fame import (
     RetiredPlayer,
     HallOfFameResponse,
 )
+from app.schemas.fantasy import (
+    FantasyLeagueCreate,
+    FantasyLeagueResponse,
+    RosterPickResponse,
+    FantasyRosterResponse,
+    RosterUpdateRequest,
+    FantasyLeaderboardEntry,
+    FantasyLeaderboardResponse,
+)
 
 __all__ = [
     "GitIdentityCreate",
@@ -134,4 +143,11 @@ __all__ = [
     "StreakRecord",
     "RetiredPlayer",
     "HallOfFameResponse",
+    "FantasyLeagueCreate",
+    "FantasyLeagueResponse",
+    "RosterPickResponse",
+    "FantasyRosterResponse",
+    "RosterUpdateRequest",
+    "FantasyLeaderboardEntry",
+    "FantasyLeaderboardResponse",
 ]
