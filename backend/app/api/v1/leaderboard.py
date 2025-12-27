@@ -13,6 +13,8 @@ from app.schemas.leaderboard import (
     LeaderboardEntry,
     PlayerInfo,
     PlayerPeriodStatsResponse,
+    AllTimeRankingEntry,
+    AllTimeLeaderboardResponse,
 )
 from app.services.leaderboard import leaderboard_service
 
@@ -95,4 +97,61 @@ def get_season_leaderboard(
         pages=pages,
         period_type=period_type,
         period_start=period_start_used,
+    )
+
+
+@router.get("/all-time", response_model=AllTimeLeaderboardResponse)
+def get_all_time_leaderboard(
+    project_id: Optional[str] = Query(None, description="Filter by project"),
+    sort_by: str = Query(
+        "total_impact_score",
+        description="Column to sort by",
+        pattern="^(total_pts|total_commits|total_impact_score|total_additions|total_deletions|total_reb|total_ast|total_blk|total_tov|seasons_count)$",
+    ),
+    order: Literal["asc", "desc"] = Query("desc", description="Sort order"),
+    page: int = Query(1, ge=1, description="Page number"),
+    limit: int = Query(50, ge=1, le=100, description="Items per page"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Get all-time leaderboard across all seasons.
+
+    Aggregates player statistics from all seasons and ranks them.
+    Supports:
+    - Sorting by any total metric (PTS, commits, impact score, etc.)
+    - Filtering by project
+    - Pagination
+    - Includes both active and retired players
+    """
+    items, total = leaderboard_service.get_all_time_leaderboard(
+        db=db,
+        project_id=project_id,
+        sort_by=sort_by,
+        order=order,
+        page=page,
+        limit=limit,
+    )
+
+    # Build response with ranks
+    entries = []
+    for idx, item in enumerate(items):
+        rank = (page - 1) * limit + idx + 1
+        entries.append(
+            AllTimeRankingEntry(
+                rank=rank,
+                **item
+            )
+        )
+
+    # Calculate total pages
+    pages = (total + limit - 1) // limit if total > 0 else 0
+
+    return AllTimeLeaderboardResponse(
+        items=entries,
+        total=total,
+        page=page,
+        pages=pages,
+        sort_by=sort_by,
+        order=order,
     )

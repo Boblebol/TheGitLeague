@@ -128,6 +128,8 @@ __all__ = [
     "PlayerInfo",
     "LeaderboardEntry",
     "LeaderboardResponse",
+    "AllTimeRankingEntry",
+    "AllTimeLeaderboardResponse",
     "PlayerSeasonStats",
     "PlayerCareerStats",
     "RepoContribution",

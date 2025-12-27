@@ -1524,6 +1524,114 @@ def get_hall_of_fame(db: Session = Depends(get_db)):
 
 ---
 
+### Feature K: All-Time Rankings
+
+**Priority:** Should-Have
+**Timeline:** Week 7-8 (Enhancement)
+**Owner:** Backend + Frontend
+
+#### Description
+Comprehensive all-time leaderboards across all seasons, supporting multiple metrics and filters. Unlike the Hall of Fame's top 10, this provides full rankings with pagination.
+
+#### User Stories
+
+**As a Player:**
+- I want to see my all-time rank, so I know where I stand historically
+- I want to compare all-time stats by different metrics (PTS, commits, impact score)
+
+**As a Spectator:**
+- I want to browse complete all-time rankings, so I can see all players' historical performance
+- I want to filter by project or metric, so I can analyze specific aspects
+
+#### Technical Implementation
+
+**All-Time Leaderboard Endpoint:**
+```python
+@router.get("/leaderboard/all-time")
+def get_all_time_leaderboard(
+    project_id: str | None = None,
+    sort_by: str = 'impact_score',  # 'pts', 'commits', 'impact_score', etc.
+    order: str = 'desc',
+    page: int = 1,
+    limit: int = 50,
+    db: Session = Depends(get_db)
+):
+    # Aggregate all PlayerPeriodStats across all seasons
+    query = (
+        db.query(
+            User.id,
+            User.display_name,
+            User.email,
+            func.sum(PlayerPeriodStats.pts).label('total_pts'),
+            func.sum(PlayerPeriodStats.commits).label('total_commits'),
+            func.sum(PlayerPeriodStats.impact_score).label('total_impact_score'),
+            func.sum(PlayerPeriodStats.additions).label('total_additions'),
+            func.sum(PlayerPeriodStats.deletions).label('total_deletions'),
+            func.count(func.distinct(PlayerPeriodStats.season_id)).label('seasons_count')
+        )
+        .join(PlayerPeriodStats, User.id == PlayerPeriodStats.user_id)
+        .group_by(User.id, User.display_name, User.email)
+    )
+
+    # Filter by project if specified
+    if project_id:
+        query = query.join(Season).filter(Season.project_id == project_id)
+
+    # Sort and paginate
+    query = query.order_by(desc(getattr(PlayerPeriodStats, sort_by)))
+    total = query.count()
+    items = query.offset((page - 1) * limit).limit(limit).all()
+
+    # Add ranks
+    ranked_items = []
+    for idx, item in enumerate(items):
+        ranked_items.append({
+            'rank': (page - 1) * limit + idx + 1,
+            'user_id': item.id,
+            'display_name': item.display_name,
+            'email': item.email,
+            'total_pts': item.total_pts,
+            'total_commits': item.total_commits,
+            'total_impact_score': item.total_impact_score,
+            'total_additions': item.total_additions,
+            'total_deletions': item.total_deletions,
+            'seasons_count': item.seasons_count
+        })
+
+    return {
+        'items': ranked_items,
+        'total': total,
+        'page': page,
+        'pages': (total + limit - 1) // limit,
+        'sort_by': sort_by,
+        'order': order
+    }
+```
+
+**Multiple Metric Support:**
+- Sort by: PTS, commits, impact_score, additions, deletions, REB, AST, BLK
+- Include career averages (per season, per commit)
+- Show active vs retired status
+
+#### Acceptance Criteria
+
+- [ ] All-time leaderboard endpoint with pagination
+- [ ] Sortable by any metric (PTS, commits, impact_score, etc.)
+- [ ] Filterable by project
+- [ ] Shows total stats + season count
+- [ ] Includes both active and retired players
+- [ ] Performance optimized for large datasets
+- [ ] Ranks calculated correctly with ties handling
+
+#### Edge Cases
+
+- **Ties:** Use secondary sort (commits, then alphabetical)
+- **No data:** Show empty state
+- **Retired players:** Include in all-time (historical accuracy)
+- **Multiple projects:** Filter or aggregate across all
+
+---
+
 ## Phase 2: Enhancement Features (V2.0)
 
 ### Search & Discovery

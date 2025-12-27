@@ -192,6 +192,132 @@ class LeaderboardService:
         else:
             return "neutral"
 
+    def get_all_time_leaderboard(
+        self,
+        db: Session,
+        project_id: Optional[str] = None,
+        sort_by: str = "total_impact_score",
+        order: Literal["asc", "desc"] = "desc",
+        page: int = 1,
+        limit: int = 50,
+    ) -> Tuple[list, int]:
+        """
+        Get all-time leaderboard across all seasons.
+
+        Args:
+            db: Database session
+            project_id: Optional project filter
+            sort_by: Column to sort by
+            order: Sort order (asc or desc)
+            page: Page number (1-indexed)
+            limit: Items per page
+
+        Returns:
+            Tuple of (leaderboard items, total count)
+        """
+        from app.models.award import Award
+        from app.models.season import Season
+
+        # Build query to aggregate stats across all seasons
+        query = (
+            db.query(
+                User.id.label("user_id"),
+                User.display_name,
+                User.email,
+                User.status,
+                func.sum(PlayerPeriodStats.pts).label("total_pts"),
+                func.sum(PlayerPeriodStats.commits).label("total_commits"),
+                func.sum(PlayerPeriodStats.impact_score).label("total_impact_score"),
+                func.sum(PlayerPeriodStats.additions).label("total_additions"),
+                func.sum(PlayerPeriodStats.deletions).label("total_deletions"),
+                func.sum(PlayerPeriodStats.reb).label("total_reb"),
+                func.sum(PlayerPeriodStats.ast).label("total_ast"),
+                func.sum(PlayerPeriodStats.blk).label("total_blk"),
+                func.sum(PlayerPeriodStats.tov).label("total_tov"),
+                func.count(func.distinct(PlayerPeriodStats.season_id)).label("seasons_count"),
+            )
+            .join(PlayerPeriodStats, User.id == PlayerPeriodStats.user_id)
+            .group_by(User.id, User.display_name, User.email, User.status)
+        )
+
+        # Filter by project if specified
+        if project_id:
+            query = (
+                query.join(Season, PlayerPeriodStats.season_id == Season.id)
+                .filter(Season.project_id == project_id)
+            )
+
+        # Validate sort column
+        valid_sort_columns = [
+            "total_pts",
+            "total_commits",
+            "total_impact_score",
+            "total_additions",
+            "total_deletions",
+            "total_reb",
+            "total_ast",
+            "total_blk",
+            "total_tov",
+            "seasons_count",
+        ]
+        if sort_by not in valid_sort_columns:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid sort column. Must be one of: {', '.join(valid_sort_columns)}",
+            )
+
+        # Apply sorting
+        if order == "desc":
+            query = query.order_by(desc(sort_by))
+        else:
+            query = query.order_by(asc(sort_by))
+
+        # Add secondary sort for ties (commits, then email)
+        query = query.order_by(desc("total_commits"), asc(User.email))
+
+        # Get total count before pagination
+        total = query.count()
+
+        # Apply pagination
+        offset = (page - 1) * limit
+        items = query.offset(offset).limit(limit).all()
+
+        # Enrich with awards count
+        result_items = []
+        for item in items:
+            awards_count = (
+                db.query(func.count(Award.id))
+                .filter(Award.user_id == item.user_id)
+                .scalar()
+            ) or 0
+
+            # Calculate averages
+            seasons = item.seasons_count or 1
+            avg_pts_per_season = float(item.total_pts or 0) / seasons
+            avg_commits_per_season = float(item.total_commits or 0) / seasons
+
+            result_items.append({
+                "user_id": item.user_id,
+                "display_name": item.display_name,
+                "email": item.email,
+                "status": item.status,
+                "total_pts": int(item.total_pts or 0),
+                "total_commits": int(item.total_commits or 0),
+                "total_impact_score": float(item.total_impact_score or 0.0),
+                "total_additions": int(item.total_additions or 0),
+                "total_deletions": int(item.total_deletions or 0),
+                "total_reb": int(item.total_reb or 0),
+                "total_ast": int(item.total_ast or 0),
+                "total_blk": int(item.total_blk or 0),
+                "total_tov": int(item.total_tov or 0),
+                "seasons_count": int(item.seasons_count or 0),
+                "awards_count": int(awards_count),
+                "avg_pts_per_season": round(avg_pts_per_season, 2),
+                "avg_commits_per_season": round(avg_commits_per_season, 2),
+            })
+
+        return result_items, total
+
 
 # Create singleton instance
 leaderboard_service = LeaderboardService()
