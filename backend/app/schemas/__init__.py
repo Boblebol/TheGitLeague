@@ -54,6 +54,15 @@ from app.schemas.leaderboard import (
     LeaderboardEntry,
     LeaderboardResponse,
 )
+from app.schemas.player import (
+    PlayerSeasonStats,
+    PlayerCareerStats,
+    RepoContribution,
+    PlayerCommitSummary,
+    PlayerProfileResponse,
+    TrendDataPoint,
+    PlayerTrendResponse,
+)
 
 __all__ = [
     "GitIdentityCreate",
@@ -98,4 +107,11 @@ __all__ = [
     "PlayerInfo",
     "LeaderboardEntry",
     "LeaderboardResponse",
+    "PlayerSeasonStats",
+    "PlayerCareerStats",
+    "RepoContribution",
+    "PlayerCommitSummary",
+    "PlayerProfileResponse",
+    "TrendDataPoint",
+    "PlayerTrendResponse",
 ]
