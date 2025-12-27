@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from app.api.v1 import auth, users, projects, repos, commits
+from app.api.v1 import auth, users, projects, repos, commits, scoring
 
 api_router = APIRouter()
 
@@ -12,3 +12,4 @@ api_router.include_router(users.router)
 api_router.include_router(projects.router)
 api_router.include_router(repos.router)
 api_router.include_router(commits.router)
+api_router.include_router(scoring.router)
