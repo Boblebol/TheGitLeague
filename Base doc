@@ -56,18 +56,30 @@
 
 ### ✅ Feature B — Gestion multi-projets & repos (Commissioner console)
 **Description**
-- Un “Project” = collection de repos.
-- Un repo est configuré avec : URL/chemin, mode d’accès (local bare / SSH / HTTPS token), branche(s) suivie(s), fréquence de sync, fenêtres d’absence.
+- Un "Project" = collection de repos.
+- Un repo est configuré avec : URL/chemin, mode d'accès (local bare / SSH / HTTPS token), branche(s) suivie(s), fréquence de sync, fenêtres d'absence.
+- **Gestion sécurisée des Personal Access Tokens (PAT)** :
+  - Un même PAT peut être utilisé pour plusieurs repos (factorisation)
+  - Tokens stockés chiffrés (Fernet AES-128) dans `repos.encrypted_credentials`
+  - Jamais exposés dans les API responses ou logs
+  - Décryptés uniquement au moment du sync Git (in-memory)
 
 **User stories**
 - En tant que **commissioner**, je veux créer un projet et y attacher plusieurs repos, pour centraliser la league.
-- En tant que **commissioner**, je veux configurer les règles d’ingestion, pour maîtriser performance & sécurité.
+- En tant que **commissioner**, je veux configurer un PAT pour accéder à plusieurs repos privés, sans le ressaisir à chaque fois.
+- En tant que **commissioner**, je veux être sûr que mes tokens sont stockés de manière sécurisée, pour protéger l'accès aux repos.
+- En tant que **commissioner**, je veux configurer les règles d'ingestion, pour maîtriser performance & sécurité.
 
-**Critères d’acceptation**
+**Critères d'acceptation**
 - [ ] CRUD Project.
 - [ ] CRUD Repo avec statut : `healthy / syncing / error`.
-- [ ] Paramètres : branches, “since date”, fréquence (cron-like simple), exclusions (paths optionnels V1.1).
-- [ ] Écran “last sync” + “last commit ingested” (sha).
+- [ ] Paramètres : branches, "since date", fréquence (cron-like simple), exclusions (paths optionnels V1.1).
+- [ ] Écran "last sync" + "last commit ingested" (sha).
+- [ ] **Sécurité PAT** :
+  - [ ] Encryption des credentials au repos (Fernet)
+  - [ ] API ne retourne jamais les tokens décryptés
+  - [ ] Audit log de tous les accès aux credentials
+  - [ ] Rate limiting sur endpoints de création/modification repos
 
 **Priorité** : **Must-have**
 
@@ -426,9 +438,15 @@ Backend (Python)
 	•	Usage : tokens magic-link / sessions
 	•	passlib[argon2]
 	•	Usage : si tu ajoutes mot de passe (optionnel)
+	•	cryptography
+	•	Usage : encryption des PAT tokens avec Fernet (AES-128 + HMAC-SHA256)
+	•	Critique : sécurité des credentials pour repos privés
 	•	celery + redis
 	•	Usage : jobs sync + recompute + awards
 	•	Alternative : rq (plus simple), dramatiq (clean)
+	•	slowapi
+	•	Usage : rate limiting sur endpoints sensibles (credentials)
+	•	Alternative : fastapi-limiter
 
 Ingestion Git
 	•	Option Python : GitPython
@@ -487,9 +505,13 @@ Core
 	•	users : id, email, role, status(approved/pending), created_at
 	•	git_identities : id, user_id, git_name, git_email_normalized
 	•	projects : id, name, slug
-	•	repos : id, project_id, name, remote, branch, last_sync_at, last_ingested_sha, status, error
+	•	repos : id, project_id, name, remote_url, access_type(local_bare|ssh|https_pat),
+	         encrypted_credentials(JSONB), encryption_key_id, branch, last_sync_at,
+	         last_ingested_sha, status, error_message, created_at, updated_at
 	•	commits : sha(pk or unique), repo_id, author_name, author_email_norm, commit_date, message_title, message_body,
 additions, deletions, files_changed, is_merge, parent_count
+	•	audit_logs : id, event_type, user_id, resource_type, resource_id, metadata(JSONB),
+	              ip_address, user_agent, created_at
 
 League
 	•	seasons : id, project_id, name, start_at, end_at, status
@@ -654,15 +676,19 @@ Wireframe
 - [ ] Repo mono (frontend + backend) + Docker compose (Postgres/Redis)
 - [ ] Next.js + shadcn/ui + layout global + auth UI
 - [ ] FastAPI skeleton + OpenAPI + RBAC middleware
-- [ ] Schéma Postgres + Alembic migrations
+- [ ] **Module encryption (Fernet) + config management**
+- [ ] Schéma Postgres + Alembic migrations (avec encrypted_credentials)
 - [ ] Modèle Projects/Repos/Users/Git identities
+- [ ] **Audit logs table + rate limiting**
 
 ### Semaine 3–4 : Ingestion Git (Core) 🧱
 - [ ] Repo config + secrets (env/Dokploy)
+- [ ] **API endpoints pour CRUD repos avec PAT encryption**
 - [ ] Worker + queue (Celery/RQ)
+- [ ] **Worker : décryption sécurisée des credentials pour Git sync**
 - [ ] Ingestion incrémentale + idempotence
 - [ ] Logs structurés + écran Sync status
-- [ ] Première agrégation “raw → player_period_stats”
+- [ ] Première agrégation "raw → player_period_stats"
 
 ### Semaine 5–6 : League Engine 🏀
 - [ ] Saisons (CRUD + active)
@@ -771,4 +797,533 @@ Proposition déterministe (explainable) :
 
 ⸻
 
-Si tu veux, je peux aussi te générer un schéma SQL V1 complet (Postgres) + un plan d’API endpoints FastAPI (routes + DTO Zod) aligné sur ces docs.
+Si tu veux, je peux aussi te générer un schéma SQL V1 complet (Postgres) + un plan d'API endpoints FastAPI (routes + DTO Zod) aligné sur ces docs.
+
+
+⸻
+
+🔐 6) SECURITY.md
+
+# 🔐 The Git League — Security Architecture
+
+## 6.1 Principes de sécurité fondamentaux
+
+### 🎯 Objectifs de sécurité
+- **Confidentialité** : Aucun code source stocké, seulement des métadonnées (SHA, stats, messages)
+- **Intégrité** : Credentials chiffrés au repos, jamais exposés dans les logs ou API
+- **Disponibilité** : Self-hosted, pas de dépendance SaaS externe
+- **Auditabilité** : Traçabilité de tous les accès aux credentials et changements de configuration
+- **Conformité** : Compatible environnements entreprise (RBAC, retention, air-gapped)
+
+---
+
+## 6.2 Gestion des Personal Access Tokens (PAT)
+
+### Architecture d'encryption
+
+**Problème adressé** :
+- Les commissioners doivent pouvoir configurer des repositories privés (GitHub/GitLab/Bitbucket)
+- Un même PAT peut être utilisé pour plusieurs repositories (factorisation)
+- Les tokens doivent être stockés de manière sécurisée dans la base de données
+
+**Solution : Encryption at-rest avec Fernet**
+
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│                    Flux d'encryption/decryption                  │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Commissioner (UI)                                               │
+│       │                                                          │
+│       │ POST /api/repos {"name": "...", "pat": "ghp_xxx..."}    │
+│       ▼                                                          │
+│  FastAPI Endpoint (RBAC: commissioner only)                      │
+│       │                                                          │
+│       │ encrypt(pat, ENCRYPTION_MASTER_KEY)                      │
+│       ▼                                                          │
+│  Database (repos.encrypted_credentials)                          │
+│       │ → {"type": "pat", "token": "gAAAAA...encrypted..."}      │
+│       │                                                          │
+│  [Sync Job triggered]                                            │
+│       │                                                          │
+│       │ fetch repo config                                        │
+│       ▼                                                          │
+│  Worker (Git Ingestion)                                          │
+│       │                                                          │
+│       │ decrypt(encrypted_token, ENCRYPTION_MASTER_KEY)          │
+│       │ → "ghp_xxx..." (en mémoire seulement)                    │
+│       ▼                                                          │
+│  Git Clone/Fetch (HTTPS with PAT)                                │
+│       │                                                          │
+│       │ clear memory (token wiped)                               │
+│       ▼                                                          │
+│  Commits ingested → DB                                           │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Bibliothèque : `cryptography` (Fernet)
+
+**Fernet** est un algorithme de chiffrement symétrique authentifié (AES-128-CBC + HMAC-SHA256) :
+- ✅ Simple à utiliser (API haut niveau)
+- ✅ Intégrité garantie (HMAC empêche la modification)
+- ✅ Timestamp inclus (permet expiration optionnelle)
+- ✅ Standard Python (via `cryptography` library)
+
+**Installation** :
+```bash
+pip install cryptography
+```
+
+**Exemple de code** :
+```python
+from cryptography.fernet import Fernet
+import os
+
+# Génération de la clé master (à faire une seule fois, stocker en env var)
+master_key = Fernet.generate_key()  # ex: b'3x...32 bytes base64...'
+
+# Encryption
+cipher = Fernet(master_key)
+encrypted_token = cipher.encrypt(b"ghp_yourPATtoken123")
+# → b'gAAAAABl...[données chiffrées]...'
+
+# Decryption
+decrypted_token = cipher.decrypt(encrypted_token)
+# → b'ghp_yourPATtoken123'
+```
+
+---
+
+## 6.3 Schéma de données pour credentials
+
+### Table `repos` (mise à jour)
+
+```sql
+CREATE TABLE repos (
+    id SERIAL PRIMARY KEY,
+    project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    remote_url TEXT NOT NULL,  -- URL sans credentials (ex: https://github.com/owner/repo.git)
+
+    -- Nouveau : Gestion des credentials
+    access_type VARCHAR(50) NOT NULL,  -- 'local_bare' | 'ssh' | 'https_pat'
+    encrypted_credentials JSONB,       -- Structure chiffrée (voir ci-dessous)
+    encryption_key_id VARCHAR(50) DEFAULT 'v1',  -- Pour rotation de clés (phase 2)
+
+    -- Métadonnées sync
+    branch VARCHAR(255) DEFAULT 'main',
+    last_sync_at TIMESTAMP,
+    last_ingested_sha VARCHAR(40),
+    status VARCHAR(50) DEFAULT 'pending',  -- 'pending' | 'healthy' | 'syncing' | 'error'
+    error_message TEXT,
+
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_repos_project_id ON repos(project_id);
+CREATE INDEX idx_repos_status ON repos(status);
+```
+
+### Structure du champ `encrypted_credentials` (JSONB)
+
+**Avant encryption** (objet JSON en clair) :
+```json
+{
+  "type": "pat",
+  "token": "ghp_yourActualPATtoken123",
+  "username": "git"  // optionnel, pour HTTPS auth
+}
+```
+
+**Après encryption** (stocké dans `repos.encrypted_credentials`) :
+```json
+{
+  "type": "pat",
+  "encrypted_data": "gAAAAABl3x...base64_encrypted_payload...",
+  "algorithm": "fernet",
+  "key_version": "v1"
+}
+```
+
+Le champ `encrypted_data` contient :
+- Le token PAT chiffré
+- Le username (si nécessaire)
+- Tout autre secret (SSH private key pour accès SSH en phase 2)
+
+---
+
+## 6.4 Configuration & gestion de la clé master
+
+### Variables d'environnement (CRITIQUES)
+
+**Fichier `.env` (JAMAIS commité dans Git)** :
+```bash
+# Encryption (MASTER KEY - CRITIQUE)
+ENCRYPTION_MASTER_KEY=3x4mpl3K3yB4s364...  # 32 bytes base64 (généré via Fernet.generate_key())
+
+# Alternative : utiliser un service de secrets management
+# Ex: Dokploy secrets, Vault, AWS Secrets Manager, etc.
+
+# Database
+DATABASE_URL=postgresql://user:password@localhost:5432/thegitleague
+
+# API Security
+SECRET_KEY=your-jwt-secret-key-min-32-chars
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=15
+
+# Environment
+ENVIRONMENT=production  # development | production
+DEBUG=false
+```
+
+### Génération de la clé master (one-time setup)
+
+**Script utilitaire** : `backend/scripts/generate_encryption_key.py`
+```python
+from cryptography.fernet import Fernet
+
+def generate_master_key():
+    """Génère une clé master Fernet (32 bytes base64)."""
+    key = Fernet.generate_key()
+    print("🔑 ENCRYPTION_MASTER_KEY (GARDEZ-LA SECRÈTE) :")
+    print(key.decode())
+    print("\n⚠️  IMPORTANT :")
+    print("1. Ajoutez cette clé à votre .env : ENCRYPTION_MASTER_KEY=<key>")
+    print("2. Ne commitez JAMAIS cette clé dans Git")
+    print("3. Sauvegardez-la dans un gestionnaire de secrets (Vault, 1Password, etc.)")
+    print("4. Si vous perdez cette clé, tous les PAT seront irrécupérables")
+
+if __name__ == "__main__":
+    generate_master_key()
+```
+
+**Utilisation** :
+```bash
+python backend/scripts/generate_encryption_key.py
+# → Copier la clé générée dans .env
+```
+
+### Rotation de clés (phase 2 — optionnel V1)
+
+Pour permettre la rotation de clés sans downtime :
+1. Ajouter `encryption_key_id` dans `repos` (ex: `v1`, `v2`)
+2. Stocker plusieurs clés dans l'environnement : `ENCRYPTION_KEY_V1`, `ENCRYPTION_KEY_V2`
+3. Déchiffrer avec la clé correspondante (`encryption_key_id`)
+4. Lors de la rotation : déchiffrer avec ancienne clé, rechiffrer avec nouvelle clé
+
+**Exemple de config multi-clés** :
+```bash
+ENCRYPTION_KEY_V1=old-key...
+ENCRYPTION_KEY_V2=new-key...
+ENCRYPTION_KEY_CURRENT=v2  # Nouvelle clé par défaut
+```
+
+---
+
+## 6.5 Bonnes pratiques de sécurité
+
+### 🔒 Stockage & accès aux credentials
+
+**DO ✅**
+- Chiffrer TOUS les secrets au repos (PAT, SSH keys, API tokens)
+- Utiliser des variables d'environnement ou un secret manager (Vault, Dokploy secrets)
+- Déchiffrer uniquement au moment de l'utilisation (dans le worker)
+- Nettoyer la mémoire après utilisation (`del token`, pas de logs)
+- Limiter l'accès aux endpoints de credentials (RBAC : commissioner only)
+
+**DON'T ❌**
+- ❌ Stocker des tokens en clair dans la DB
+- ❌ Logger les tokens (même partiellement)
+- ❌ Retourner les tokens décryptés dans les réponses API
+- ❌ Committer `.env` ou fichiers contenant des secrets
+- ❌ Utiliser des tokens personnels (créer un compte "bot" dédié)
+
+### 🔍 Audit & monitoring
+
+**Événements à auditer** (table `audit_logs`) :
+- Création/modification/suppression de repos avec credentials
+- Accès aux credentials pour sync Git
+- Changements de configuration RBAC
+- Approbations de spectators
+- Modifications de règles de scoring
+
+**Structure recommandée** :
+```sql
+CREATE TABLE audit_logs (
+    id SERIAL PRIMARY KEY,
+    event_type VARCHAR(100) NOT NULL,  -- 'repo.credentials.accessed', 'repo.created', etc.
+    user_id INTEGER REFERENCES users(id),
+    resource_type VARCHAR(50),  -- 'repo', 'project', 'season'
+    resource_id INTEGER,
+    metadata JSONB,  -- Détails (SANS secrets)
+    ip_address INET,
+    user_agent TEXT,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_audit_logs_event_type ON audit_logs(event_type);
+CREATE INDEX idx_audit_logs_created_at ON audit_logs(created_at);
+```
+
+**Exemple d'audit log** :
+```json
+{
+  "event_type": "repo.credentials.accessed",
+  "user_id": null,  // Accès par worker (pas un user)
+  "resource_type": "repo",
+  "resource_id": 42,
+  "metadata": {
+    "action": "git_sync",
+    "repo_name": "myorg/backend",
+    "success": true,
+    "duration_ms": 3421
+  },
+  "created_at": "2025-12-28T10:32:15Z"
+}
+```
+
+### 🛡️ Rate limiting & protection
+
+**Endpoints sensibles** :
+- `POST /api/repos` (création avec credentials)
+- `PUT /api/repos/{id}` (modification credentials)
+- `POST /api/repos/{id}/sync` (déclenchement sync)
+
+**Stratégie** :
+- Rate limiting : max 10 req/min par commissioner pour endpoints credentials
+- Implémentation : Redis + middleware FastAPI
+- Lockout temporaire après 5 échecs d'auth consécutifs
+
+**Exemple (FastAPI)** :
+```python
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
+limiter = Limiter(key_func=get_remote_address)
+
+@app.post("/api/repos", dependencies=[Depends(require_commissioner)])
+@limiter.limit("10/minute")
+async def create_repo(request: Request, repo: RepoCreate):
+    # ...
+```
+
+### 🔐 RBAC strict
+
+**Matrice d'accès** :
+
+| Endpoint | Commissioner | Player | Spectator |
+|----------|--------------|--------|-----------|
+| `GET /api/repos` | ✅ (liste complète) | ✅ (liste sans credentials) | ✅ (si approved) |
+| `POST /api/repos` | ✅ | ❌ | ❌ |
+| `PUT /api/repos/{id}` | ✅ | ❌ | ❌ |
+| `DELETE /api/repos/{id}` | ✅ | ❌ | ❌ |
+| `POST /api/repos/{id}/sync` | ✅ | ❌ | ❌ |
+| `GET /api/repos/{id}` | ✅ (avec metadata) | ✅ (sans credentials) | ✅ (si approved) |
+
+**Implémentation FastAPI** :
+```python
+from fastapi import Depends, HTTPException, status
+from backend.core.auth import get_current_user
+
+def require_commissioner(user = Depends(get_current_user)):
+    if user.role != "commissioner":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This action requires commissioner role"
+        )
+    return user
+```
+
+---
+
+## 6.6 Sécurité réseau & déploiement
+
+### 🌐 Déploiement self-hosted (Docker Compose)
+
+**Recommandations** :
+- ✅ Utiliser un reverse proxy (Traefik, Nginx) avec HTTPS (Let's Encrypt)
+- ✅ Isoler la DB dans un réseau Docker privé (pas d'exposition publique)
+- ✅ Limiter les ports ouverts : seulement 80/443 (HTTP/HTTPS)
+- ✅ Configurer les secrets via Docker secrets ou Dokploy
+
+**Exemple `docker-compose.yml` (extrait)** :
+```yaml
+version: "3.9"
+
+services:
+  backend:
+    build: ./backend
+    environment:
+      - DATABASE_URL=postgresql://user:password@db:5432/thegitleague
+      # ⚠️ SECRETS via fichier .env (pas en clair ici)
+    env_file:
+      - .env  # Contient ENCRYPTION_MASTER_KEY
+    networks:
+      - app-network
+    depends_on:
+      - db
+      - redis
+
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: thegitleague
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: ${DB_PASSWORD}  # Variable d'env
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - app-network
+    # Pas de ports exposés publiquement (seulement accessible via app-network)
+
+  redis:
+    image: redis:7-alpine
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+```
+
+### 🔥 Firewall & accès
+
+**Règles recommandées** :
+- Autoriser : ports 80/443 (frontend + API)
+- Bloquer : port 5432 (Postgres), 6379 (Redis) depuis l'extérieur
+- Optionnel : VPN/Tailscale pour accès admin (commissioner console)
+
+---
+
+## 6.7 Conformité & certifications (roadmap phase 2)
+
+### Objectifs entreprise
+
+**V1** :
+- ✅ Encryption at-rest (Fernet)
+- ✅ RBAC
+- ✅ Audit logs
+- ✅ Self-hosted (pas d'exfiltration)
+
+**Phase 2** :
+- 🔜 Encryption in-transit (HTTPS obligatoire)
+- 🔜 Backup chiffré (Postgres + secrets)
+- 🔜 SSO/SAML (authentification entreprise)
+- 🔜 Rétention configurable (RGPD : droit à l'oubli)
+- 🔜 Pen-test + security audit
+
+**Phase 3** :
+- 🔜 SOC 2 Type II (si version SaaS future)
+- 🔜 ISO 27001 compliance
+- 🔜 Air-gapped mode (pas de dépendances externes)
+
+---
+
+## 6.8 Gestion des incidents & recovery
+
+### 🚨 Scénarios de compromission
+
+#### Scénario 1 : Fuite de la clé master (`ENCRYPTION_MASTER_KEY`)
+
+**Impact** : Un attaquant peut déchiffrer tous les PAT stockés.
+
+**Actions immédiates** :
+1. Révoquer TOUS les PAT sur les plateformes (GitHub/GitLab)
+2. Générer une nouvelle clé master (`Fernet.generate_key()`)
+3. Régénérer de nouveaux PAT
+4. Re-chiffrer les credentials avec la nouvelle clé
+5. Investiguer comment la clé a fuité (logs, audit)
+
+**Prévention** :
+- Stocker la clé dans un secret manager (Vault, AWS Secrets Manager)
+- Limiter l'accès au fichier `.env` (permissions 600, owner-only)
+- Pas de commit de `.env` dans Git (`.gitignore`)
+
+#### Scénario 2 : Base de données compromise
+
+**Impact** : Les credentials chiffrés sont exposés, mais inutilisables sans la clé master.
+
+**Actions** :
+1. Vérifier si la clé master est également compromise
+2. Si non : les credentials restent protégés (Fernet = AES + HMAC)
+3. Si oui : suivre Scénario 1
+4. Restaurer la DB depuis un backup propre
+5. Renforcer les accès DB (firewall, réseau privé)
+
+#### Scénario 3 : Compte commissioner compromis
+
+**Impact** : Un attaquant peut créer/modifier des repos et voir les métadonnées (mais pas déchiffrer les PAT via l'API).
+
+**Actions** :
+1. Suspendre le compte commissioner compromis
+2. Auditer les actions récentes (table `audit_logs`)
+3. Révoquer les tokens de session
+4. Forcer MFA (phase 2)
+5. Notifier les autres commissioners
+
+---
+
+## 6.9 Checklist de déploiement sécurisé
+
+**Avant de déployer en production** :
+- [ ] Générer une clé master Fernet unique (`generate_encryption_key.py`)
+- [ ] Stocker la clé dans un gestionnaire de secrets (Vault, Dokploy, 1Password)
+- [ ] Configurer `.env` avec `ENCRYPTION_MASTER_KEY` (permissions 600)
+- [ ] Ajouter `.env` au `.gitignore`
+- [ ] Activer HTTPS sur le reverse proxy (Let's Encrypt)
+- [ ] Limiter l'accès DB/Redis au réseau Docker interne
+- [ ] Configurer les audit logs (`audit_logs` table)
+- [ ] Tester l'encryption/decryption (tests unitaires)
+- [ ] Documenter la procédure de rotation de clés
+- [ ] Définir un plan de backup (DB + secrets)
+- [ ] Configurer le rate limiting sur les endpoints sensibles
+- [ ] Activer les logs structurés (JSON) pour monitoring
+- [ ] Mettre en place des alertes (échecs de sync, accès anormaux)
+
+---
+
+## 6.10 Ressources & références
+
+### Documentation officielle
+- **Cryptography (Fernet)** : https://cryptography.io/en/latest/fernet/
+- **FastAPI Security** : https://fastapi.tiangolo.com/tutorial/security/
+- **OWASP Top 10** : https://owasp.org/www-project-top-ten/
+- **NIST Encryption Standards** : https://csrc.nist.gov/publications/
+
+### Outils recommandés
+- **Secret scanning** : `truffleHog`, `GitGuardian`
+- **Static analysis** : `bandit` (Python), `semgrep`
+- **Dependency scanning** : `pip-audit`, `safety`
+- **Container scanning** : `trivy`, `grype`
+
+### Exemples de politique de sécurité
+```markdown
+# Security Policy
+
+## Reporting a vulnerability
+Please report security issues to: security@yourdomain.com
+Response time: < 48h
+
+## Supported versions
+| Version | Supported |
+|---------|-----------|
+| 1.x     | ✅        |
+| 0.x     | ❌        |
+
+## Security features
+- Encryption at-rest (Fernet AES-128)
+- RBAC (Commissioner/Player/Spectator)
+- Audit logging
+- Rate limiting
+- HTTPS-only in production
+```
+
+---
+
+**Fin du document SECURITY.md** ✅
