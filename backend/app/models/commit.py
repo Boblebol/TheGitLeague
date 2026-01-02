@@ -1,7 +1,7 @@
 """Commit model."""
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy import Boolean, DateTime, Integer, String, Text, ForeignKey, Index
@@ -59,7 +59,7 @@ class Commit(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         nullable=False,
-        default=datetime.utcnow,
+        default=lambda: datetime.now(timezone.utc),
     )
 
     # Relationships

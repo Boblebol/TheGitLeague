@@ -5,7 +5,7 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
-from app.models.project import RemoteType, RepoStatus
+from app.models.project import RemoteType, RepoStatus, SyncMethod
 
 
 # ===== Project Schemas =====
@@ -67,9 +67,10 @@ class RepositoryBase(BaseModel):
 
     name: str = Field(..., min_length=1, max_length=255, description="Repository name")
     remote_url: Optional[str] = Field(None, description="Remote Git URL")
-    remote_type: RemoteType = Field(RemoteType.LOCAL, description="Remote type (local, ssh, https)")
+    remote_type: Optional[RemoteType] = Field(None, description="Remote type (local, ssh, https)")
     branch: str = Field("main", min_length=1, max_length=255, description="Git branch to track")
     sync_frequency: Optional[str] = Field(None, description="Sync frequency (cron syntax)")
+    sync_method: SyncMethod = Field(SyncMethod.PULL_CELERY, description="Sync method (pull_celery or push_client)")
 
 
 class RepositoryCreate(RepositoryBase):
@@ -86,6 +87,7 @@ class RepositoryUpdate(BaseModel):
     remote_type: Optional[RemoteType] = None
     branch: Optional[str] = Field(None, min_length=1, max_length=255)
     sync_frequency: Optional[str] = None
+    sync_method: Optional[SyncMethod] = None
     credentials: Optional[dict] = None
 
 
@@ -100,6 +102,7 @@ class RepositoryResponse(RepositoryBase):
     error_message: Optional[str] = None
     created_at: datetime
     updated_at: datetime
+    sync_method: SyncMethod
 
     class Config:
         from_attributes = True
@@ -123,7 +126,7 @@ class RepositoryTestConnectionRequest(BaseModel):
     """Schema for testing repository connection."""
 
     remote_url: str
-    remote_type: RemoteType
+    remote_type: Optional[RemoteType] = None
     branch: str = "main"
     credentials: Optional[dict] = None
 

@@ -6,12 +6,21 @@ from sqlalchemy.orm import sessionmaker
 
 from app.core.config import settings
 
-# Create database engine
+# Create database engine with dialect-appropriate options
+engine_kwargs = {
+    "pool_pre_ping": True,
+}
+
+# Only add pool options for PostgreSQL (not SQLite)
+if not settings.DATABASE_URL.startswith("sqlite://"):
+    engine_kwargs.update({
+        "pool_size": 10,
+        "max_overflow": 20,
+    })
+
 engine = create_engine(
     settings.DATABASE_URL,
-    pool_pre_ping=True,
-    pool_size=10,
-    max_overflow=20,
+    **engine_kwargs
 )
 
 # Create session factory

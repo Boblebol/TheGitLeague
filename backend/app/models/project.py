@@ -36,6 +36,13 @@ class RepoStatus(str, enum.Enum):
     ERROR = "error"
 
 
+class SyncMethod(str, enum.Enum):
+    """Repository synchronization method."""
+
+    PULL_CELERY = "pull_celery"  # Legacy: Celery pulls commits from remote
+    PUSH_CLIENT = "push_client"  # New: External client pushes commits via API
+
+
 class Project(Base):
     """Project model - collection of repositories."""
 
@@ -78,10 +85,16 @@ class Repository(Base):
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     remote_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    remote_type: Mapped[str] = mapped_column(
-        Enum(RemoteType, native_enum=False, length=20), nullable=False, default=RemoteType.LOCAL
+    remote_type: Mapped[Optional[str]] = mapped_column(
+        Enum(RemoteType, native_enum=False, length=20), nullable=True, default=RemoteType.LOCAL
     )
     branch: Mapped[str] = mapped_column(String(255), nullable=False, default="main")
+    sync_method: Mapped[str] = mapped_column(
+        Enum(SyncMethod, native_enum=False, length=20),
+        nullable=False,
+        default=SyncMethod.PULL_CELERY,
+        index=True,
+    )
     sync_frequency: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # Cron syntax
     last_sync_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     last_ingested_sha: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)

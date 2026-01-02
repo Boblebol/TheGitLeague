@@ -8,12 +8,18 @@ from app.models.user import (
     UserRole,
     UserStatus,
 )
+from app.models.api_key import (
+    APIKey,
+    APIKeyStatus,
+    APIKeyScope,
+)
 from app.models.project import (
     Project,
     Repository,
     ProjectConfig,
     RemoteType,
     RepoStatus,
+    SyncMethod,
 )
 from app.models.commit import Commit
 from app.models.season import (
@@ -37,6 +43,9 @@ __all__ = [
     "AuditLog",
     "UserRole",
     "UserStatus",
+    "APIKey",
+    "APIKeyStatus",
+    "APIKeyScope",
     "Project",
     "Repository",
     "ProjectConfig",
