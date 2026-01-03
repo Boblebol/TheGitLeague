@@ -1,0 +1,45 @@
+# GitLeague Client - Repository Configuration
+#
+# This file defines which repositories to synchronize with GitLeague.
+# Get your API key and project ID from the GitLeague web interface.
+
+api_url: "https://api.thegitleague.com"
+
+# API Key for authentication
+# You can either:
+# 1. Set it here (not recommended - don't commit this!)
+# 2. Set the GITLEAGUE_API_KEY environment variable
+# api_key: "tgl_xxxxxxxx_yyyyyyyyyyyyyyyyyyyyyyyyyyyy"
+
+# Sync settings
+batch_size: 100        # Commits per batch (1-1000)
+max_retries: 3         # Retry on transient errors
+
+# Projects to synchronize
+projects:
+  # Example project with mixed authentication methods
+  - name: "My Amazing Project"
+    project_id: "550e8400-e29b-41d4-a716-446655440000"  # From web UI
+    repos:
+      # Repository with SSH authentication
+      - path: "~/projects/my-app"
+        git_url: "git@github.com:mycompany/my-app.git"
+        ssh_key: "~/.ssh/id_ed25519"
+
+      # Repository with HTTPS and personal access token
+      - path: "~/projects/api-service"
+        git_url: "https://github.com/mycompany/api-service.git"
+        username: "myuser"
+        password_env: "GITHUB_TOKEN"  # Token stored in env var
+
+      # Repository with HTTPS (no auth - public repo)
+      - path: "~/projects/open-source"
+        git_url: "https://github.com/mycompany/open-source-lib.git"
+
+  # Another example project
+  - name: "Infrastructure"
+    project_id: "660e8400-e29b-41d4-a716-446655440111"
+    repos:
+      - path: "~/infrastructure/terraform"
+        git_url: "git@github.com:mycompany/infrastructure.git"
+        ssh_key: "~/.ssh/id_rsa"

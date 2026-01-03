@@ -1,0 +1,1 @@
+"""GitLeague Client tests."""
