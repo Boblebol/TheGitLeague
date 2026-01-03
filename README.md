@@ -93,14 +93,95 @@ open http://localhost:3000
 
 ---
 
+## 🐍 Python Client (Push Commits)
+
+### What is the gitleague-client?
+
+A lightweight Python package that commissioners and developers can use to **push commits directly to The Git League** from their local machines. No pull-based Celery sync — just a simple CLI tool that extracts commits from your Git repos and submits them via API.
+
+### Key Benefits
+- 🔐 **PAT tokens stay local** — GitHub/GitLab tokens never leave your machine
+- ⚡ **Fast & efficient** — Incremental syncing with deduplication
+- 🎯 **Simple configuration** — YAML-based setup
+- 🔄 **Batch processing** — Push multiple repos and thousands of commits in one command
+- 🧪 **Dry-run mode** — Preview what will be synced before sending
+
+### Installation
+
+```bash
+# Via pip (when published to PyPI)
+pip install gitleague-client
+
+# Or from source
+git clone https://github.com/Boblebol/TheGitLeague.git
+cd TheGitLeague/gitleague-client
+pip install -e .
+```
+
+### Quick Start
+
+#### 1. Initialize Configuration
+```bash
+gitleague-client init
+```
+This creates a `repos.yaml` file with your API key and Git repos.
+
+#### 2. Validate Setup
+```bash
+gitleague-client test --config repos.yaml
+```
+Verifies that repositories are accessible and API key is valid.
+
+#### 3. Sync Commits
+```bash
+gitleague-client sync --config repos.yaml
+```
+Pushes all commits to The Git League. Add `--dry-run` to preview first.
+
+### Example Configuration (repos.yaml)
+
+```yaml
+api:
+  url: http://localhost:8000
+  key: tgl_xxxxxxxxxxxxx_yyyyyyyyyyyyy
+
+repositories:
+  - name: "backend"
+    path: /home/dev/projects/my-backend
+
+  - name: "frontend"
+    path: /home/dev/projects/my-frontend
+
+  - name: "infra"
+    path: /home/dev/projects/infrastructure
+```
+
+### Full Documentation
+
+👉 See [**gitleague-client README**](./gitleague-client/README.md) for complete documentation including:
+- Authentication setup
+- Configuration options
+- Batch processing
+- Error handling
+- Contributing to the client
+
+---
+
 ## 📖 Documentation
 
+- [**Python Client Guide**](./gitleague-client/README.md) — Installation, configuration, and usage of the CLI tool
+- [**Backend Setup**](./backend/README.md) — Backend API, database, and services documentation
 - [**Development Guide**](./DEVELOPMENT.md) — Setup dev environment, architecture, stack
 - [**Email Setup Guide**](./EMAIL_SETUP.md) — Configure email providers for magic link authentication
 - [**Security Audit**](./SECURITY.md) — Security measures, vulnerabilities, and recommendations
 - [**Contributing**](./CONTRIBUTING.md) — How to contribute to the project
 - [**Architecture**](./ARCHITECTURE.md) — Technical design and data models
 - [**API Specification**](./API_SPEC.md) — REST API endpoints and schemas
+- [**Testing Documentation**](./backend/TESTING.md) — Backend test suite and coverage (164 tests)
+- [**Deployment Guide**](./DEPLOYMENT.md) — Multi-platform deployment instructions
+- [**Accessibility**](./ACCESSIBILITY.md) — WCAG 2.1 Level AA compliance
+- [**FAQ**](./FAQ.md) — Frequently asked questions and troubleshooting
+- [**Open Source Readiness**](./OPEN_SOURCE_READINESS.md) — Audit report and open-source certification
 - [**PRD (Product Requirements)**](./Base%20doc#PRD) — Full product vision and features
 - [**UX Guidelines**](./Base%20doc#UX_GUIDELINES) — Design principles and flows
 - [**Roadmap**](./Base%20doc#ROADMAP_AND_GTM) — Feature timeline and go-to-market
