@@ -83,15 +83,62 @@ docker-compose up -d
 open http://localhost:3000
 ```
 
+### Complete Data Collection Workflow
+
+**⚠️ Important:** The Git League requires both a **server** (backend with database) and a **client** (Python CLI) to function.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ Phase 1: SERVER SETUP (Docker)                                  │
+├─────────────────────────────────────────────────────────────────┤
+│ 1. Install Docker & Docker Compose                              │
+│ 2. Clone this repo and configure .env                           │
+│ 3. Run: docker-compose up -d                                    │
+│ 4. Access web UI at http://localhost:3000                       │
+│ 5. Create commissioner account                                  │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ Phase 2: CONFIGURE SERVER                                        │
+├─────────────────────────────────────────────────────────────────┤
+│ 1. Create API key from Settings (for client authentication)      │
+│ 2. Create projects/seasons (optional, or just use CLI)           │
+│ 3. Configure scoring rules if needed                             │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ Phase 3: CLIENT SETUP (Python) - ON YOUR LOCAL MACHINE          │
+├─────────────────────────────────────────────────────────────────┤
+│ 1. Install: pip install gitleague-client                         │
+│ 2. Run: gitleague-client init                                   │
+│ 3. Configure repos.yaml with:                                   │
+│    - API URL (http://localhost:8000)                            │
+│    - API key from Phase 2                                       │
+│    - Repository paths                                           │
+│ 4. Test: gitleague-client test --config repos.yaml              │
+│ 5. Sync: gitleague-client sync --config repos.yaml              │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ Phase 4: WATCH THE MAGIC ✨                                      │
+├─────────────────────────────────────────────────────────────────┤
+│ • Stats calculated automatically                                │
+│ • Leaderboards updated in real-time                             │
+│ • Awards assigned                                               │
+│ • Schedule regular syncs (cron, CI/CD, etc.)                    │
+└─────────────────────────────────────────────────────────────────┘
+```
+
 ### First Setup (Commissioner)
 
 1. **Create your account** — First user becomes Commissioner
-2. **Create a project** — Settings → Projects → New Project
-3. **Add repositories** — Configure repos with remote URLs and sync frequency
-4. **Run initial sync** — Sync Now to ingest commit history
-5. **Create a season** — Define start/end dates and activate
-6. **Configure scoring rules** — Adjust NBA metric coefficients
-7. **Invite players** — Email invitations with automatic identity matching
+2. **Create a project** — Settings → Projects → New Project (optional with CLI)
+3. **Generate API Key** — Settings → API Keys → Create new key (needed for client)
+4. **Create a season** — Define start/end dates and activate (or use CLI)
+5. **Configure scoring rules** — Adjust NBA metric coefficients
+6. **Install client** — On your local machine: `pip install gitleague-client`
+7. **Configure client** — Create repos.yaml with API key and repository paths
+8. **Sync data** — Run `gitleague-client sync` to start collecting commits
 
 ---
 
