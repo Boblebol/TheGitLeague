@@ -171,6 +171,7 @@ repositories:
 
 ## 📖 Documentation
 
+- [**Landing Page**](https://github.com/Boblebol/TheGitLeague_Landing) — Modern, responsive landing page with project showcase
 - [**Python Client Guide**](./gitleague-client/README.md) — Installation, configuration, and usage of the CLI tool
 - [**Backend Setup**](./backend/README.md) — Backend API, database, and services documentation
 - [**Development Guide**](./DEVELOPMENT.md) — Setup dev environment, architecture, stack
