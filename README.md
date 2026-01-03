@@ -1,6 +1,8 @@
 # 🏀 The Git League
 
 > Turn your Git activity into an NBA season — stats, leaderboards, awards, and fantasy league.
+>
+> Created by [Alexandre Enouf](https://alexandre-enouf.fr) | [LinkedIn](https://fr.linkedin.com/in/alexandre-enouf-47834990) | [AI Fabrik](https://aifabrik.ovh)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Self-Hosted](https://img.shields.io/badge/deployment-self--hosted-blue)](https://github.com/Boblebol/TheGitLeague)
@@ -333,6 +335,16 @@ This project is licensed under the **MIT License** — see [LICENSE](./LICENSE) 
 - **GitHub Issues:** [Report bugs or request features](https://github.com/Boblebol/TheGitLeague/issues)
 - **Discussions:** [Ask questions and share ideas](https://github.com/Boblebol/TheGitLeague/discussions)
 - **Documentation:** [Full docs](./docs/)
+
+---
+
+## 👨‍💻 About the Creator
+
+**Alexandre Enouf** is a full-stack developer and AI enthusiast passionate about building innovative solutions.
+
+- 🌐 **Website:** [alexandre-enouf.fr](https://alexandre-enouf.fr)
+- 💼 **LinkedIn:** [linkedin.com/in/alexandre-enouf-47834990](https://fr.linkedin.com/in/alexandre-enouf-47834990)
+- 🤖 **AI Projects:** [aifabrik.ovh](https://aifabrik.ovh) - Explore more AI-powered projects created with Claude
 
 ---
 
