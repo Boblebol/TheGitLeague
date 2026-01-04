@@ -14,11 +14,15 @@ Push commits from your local Git repositories to [GitLeague](https://thegitleagu
 
 ## Installation
 
+### From PyPI (Recommended)
+
 ```bash
 pip install gitleague-client
 ```
 
-Or from source:
+📦 **View on PyPI:** https://pypi.org/project/gitleague-client/
+
+### From Source
 
 ```bash
 git clone https://github.com/thegitleague/gitleague-client

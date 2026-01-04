@@ -284,7 +284,19 @@ This document outlines the development roadmap for **The Git League**.
   - Metrics collection (Prometheus-ready)
   - Error tracking integration hooks
 
+- [x] **Python Client (gitleague-client)**
+  - ✅ Core CLI application with Git scanning and API integration
+  - ✅ YAML-based configuration system
+  - ✅ Batch commit synchronization
+  - ✅ Dry-run mode for preview
+  - ✅ SSH and HTTPS authentication support
+  - ✅ Retry logic with exponential backoff
+  - 🔄 PyPI publication (in progress) — See [PYPI_PUBLISH_GUIDE.md](./PYPI_PUBLISH_GUIDE.md)
+
 - [ ] **Documentation polish**
+  - [x] Python Client Installation Guide — See [CLIENT_INSTALLATION_GUIDE.md](./CLIENT_INSTALLATION_GUIDE.md)
+  - [x] Python Client README with examples
+  - [x] PyPI Publication Guide — See [PYPI_PUBLISH_GUIDE.md](./PYPI_PUBLISH_GUIDE.md)
   - README with screenshots
   - Self-hosting guide (Dokploy, Docker Compose)
   - Environment variables documentation
@@ -575,6 +587,8 @@ This document outlines the development roadmap for **The Git League**.
 
 ## 📅 Release Schedule
 
+### Backend & Frontend Releases
+
 | Version | Target Date | Key Features |
 |---------|-------------|--------------|
 | **v0.1.0** | Week 6 | Git ingestion + basic stats |
@@ -584,11 +598,51 @@ This document outlines the development roadmap for **The Git League**.
 | **v2.0.0** | Month 6 | Anti-bias + SSO |
 | **v3.0.0** | Month 12 | AI features + deep integrations |
 
+### Client Releases
+
+| Version | Status | Installation |
+|---------|--------|--------------|
+| **v0.1.0** | 🟡 Ready for PyPI | `pip install gitleague-client` (once published) |
+
+---
+
+## 🐍 Python Client (gitleague-client) Status
+
+### Current State
+- ✅ **Development Complete** — Core CLI fully functional
+- ✅ **Tested** — 27 unit tests with 85%+ coverage
+- ✅ **Documentation** — Complete README and API docs
+- 🔄 **PyPI Publication** — Steps ready, awaiting token setup
+
+### What's Included
+- Push-based Git commit synchronization
+- YAML configuration with multiple auth methods
+- Batch processing (1-1000 commits per request)
+- Retry logic with exponential backoff
+- Dry-run mode for safe previewing
+- Full CLI with `init`, `test`, and `sync` commands
+
+### How to Get Started
+
+**Installation:**
+```bash
+pip install gitleague-client
+gitleague-client init  # Interactive setup
+gitleague-client sync --config repos.yaml  # Start syncing
+```
+
+**Full Guides:**
+1. 📖 [Client Installation Guide](./CLIENT_INSTALLATION_GUIDE.md) — Complete setup walkthrough
+2. 🚀 [PyPI Publication Guide](./PYPI_PUBLISH_GUIDE.md) — How to publish to PyPI
+3. 📚 [Client README](./gitleague-client/README.md) — Detailed API and configuration
+
 ---
 
 **Next Steps:**
 1. Follow [DEVELOPMENT.md](./DEVELOPMENT.md) to set up your environment
-2. Check [FEATURES_SUMMARY.md](./FEATURES_SUMMARY.md) for feature-by-feature breakdown
-3. Join discussions on GitHub to shape the roadmap
+2. Install the Python client: [CLIENT_INSTALLATION_GUIDE.md](./CLIENT_INSTALLATION_GUIDE.md)
+3. Publish to PyPI: [PYPI_PUBLISH_GUIDE.md](./PYPI_PUBLISH_GUIDE.md)
+4. Check [FEATURES_SUMMARY.md](./FEATURES_SUMMARY.md) for feature-by-feature breakdown
+5. Join discussions on GitHub to shape the roadmap
 
 **Your feedback shapes this roadmap!** 🏀

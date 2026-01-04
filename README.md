@@ -157,11 +157,17 @@ A lightweight Python package that commissioners and developers can use to **push
 
 ### Installation
 
-```bash
-# Via pip (when published to PyPI)
-pip install gitleague-client
+**From PyPI (Recommended):**
 
-# Or from source
+```bash
+pip install gitleague-client
+```
+
+📦 **View on PyPI:** https://pypi.org/project/gitleague-client/
+
+**From Source:**
+
+```bash
 git clone https://github.com/Boblebol/TheGitLeague.git
 cd TheGitLeague/gitleague-client
 pip install -e .
@@ -218,23 +224,34 @@ repositories:
 
 ## 📖 Documentation
 
+### 🐍 Client Installation & Deployment
+- [**Client Installation Guide**](./CLIENT_INSTALLATION_GUIDE.md) — Complete setup walkthrough for gitleague-client
+- [**PyPI Publication Guide**](./PYPI_PUBLISH_GUIDE.md) — How to publish the client to PyPI
+- [**Python Client README**](./gitleague-client/README.md) — API reference and configuration options
+
+### 🔧 Core Documentation
 - [**Landing Page**](https://github.com/Boblebol/TheGitLeague_Landing) — Modern, responsive landing page with project showcase
-- [**Python Client Guide**](./gitleague-client/README.md) — Installation, configuration, and usage of the CLI tool
 - [**Backend Setup**](./backend/README.md) — Backend API, database, and services documentation
 - [**Development Guide**](./DEVELOPMENT.md) — Setup dev environment, architecture, stack
 - [**Email Setup Guide**](./EMAIL_SETUP.md) — Configure email providers for magic link authentication
-- [**Security Audit**](./SECURITY.md) — Security measures, vulnerabilities, and recommendations
-- [**Contributing**](./CONTRIBUTING.md) — How to contribute to the project
+
+### 📋 Architecture & API
 - [**Architecture**](./ARCHITECTURE.md) — Technical design and data models
 - [**API Specification**](./API_SPEC.md) — REST API endpoints and schemas
+- [**Security Audit**](./SECURITY.md) — Security measures, vulnerabilities, and recommendations
+
+### 📊 Testing & Quality
 - [**Testing Documentation**](./backend/TESTING.md) — Backend test suite and coverage (164 tests)
 - [**Deployment Guide**](./DEPLOYMENT.md) — Multi-platform deployment instructions
 - [**Accessibility**](./ACCESSIBILITY.md) — WCAG 2.1 Level AA compliance
+
+### 📚 Resources & Community
+- [**Roadmap**](./ROADMAP.md) — Feature timeline and Python client status
+- [**Contributing**](./CONTRIBUTING.md) — How to contribute to the project
 - [**FAQ**](./FAQ.md) — Frequently asked questions and troubleshooting
 - [**Open Source Readiness**](./OPEN_SOURCE_READINESS.md) — Audit report and open-source certification
 - [**PRD (Product Requirements)**](./Base%20doc#PRD) — Full product vision and features
 - [**UX Guidelines**](./Base%20doc#UX_GUIDELINES) — Design principles and flows
-- [**Roadmap**](./Base%20doc#ROADMAP_AND_GTM) — Feature timeline and go-to-market
 
 ---
 
